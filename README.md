@@ -18,7 +18,8 @@ The initial packages are:
 - `web`: embedded SPA/static serving with safe fallback and cache rules.
 
 There is intentionally no app object, router, ORM, repository layer, generic worker, deployment
-runtime, or shared visual system.
+runtime, generated API contract layer, or shared visual system. The bounded Read-like generation
+experiment and rejection are recorded in [docs/api-contract-generation.md](docs/api-contract-generation.md).
 
 ## Minimal use
 
