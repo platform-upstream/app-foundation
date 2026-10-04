@@ -45,3 +45,37 @@ func TestAtomicWrite(t *testing.T) {
 		t.Fatalf("content = %q", raw)
 	}
 }
+
+func TestRejectsTargetReplacementDuringOpen(t *testing.T) {
+	parent := t.TempDir()
+	target := filepath.Join(parent, "target")
+	replacement := filepath.Join(parent, "replacement")
+	moved := filepath.Join(parent, "observed")
+	for _, directory := range []string{target, replacement} {
+		if err := os.Mkdir(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, err := open(target, func(name string) (*os.Root, error) {
+		if err := os.Rename(target, moved); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Rename(replacement, target); err != nil {
+			t.Fatal(err)
+		}
+		return os.OpenRoot(name)
+	})
+	if err == nil {
+		t.Fatal("replacement target was accepted")
+	}
+}
+
+func TestRejectsSymlinkTarget(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "target")
+	if err := os.Symlink(t.TempDir(), target); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Open(target); err == nil {
+		t.Fatal("symlink target was accepted")
+	}
+}

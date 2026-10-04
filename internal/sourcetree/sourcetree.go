@@ -20,19 +20,30 @@ type Tree struct {
 
 // Open rejects a symlink/non-directory target and anchors an existing Tree.
 func Open(target string) (*Tree, error) {
+	return open(target, os.OpenRoot)
+}
+
+func open(target string, openRoot func(string) (*os.Root, error)) (*Tree, error) {
 	if target == "" {
 		return nil, errors.New("source tree target is required")
 	}
-	info, err := os.Lstat(target)
+	observed, err := os.Lstat(target)
 	if err != nil {
 		return nil, err
 	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+	if observed.Mode()&os.ModeSymlink != 0 || !observed.IsDir() {
 		return nil, fmt.Errorf("source tree target must be a real directory")
 	}
-	root, err := os.OpenRoot(target)
+	root, err := openRoot(target)
 	if err != nil {
 		return nil, err
+	}
+	anchored, anchorErr := root.Stat(".")
+	current, currentErr := os.Lstat(target)
+	if anchorErr != nil || currentErr != nil || current.Mode()&os.ModeSymlink != 0 || !current.IsDir() ||
+		!os.SameFile(observed, anchored) || !os.SameFile(current, anchored) {
+		_ = root.Close()
+		return nil, errors.New("source tree target changed while it was opened")
 	}
 	return &Tree{root: root}, nil
 }
