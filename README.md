@@ -9,6 +9,8 @@ The initial packages are:
 - `access`: bounded Cloudflare Access JWT verification and loopback-only local mode.
 - `httpx`: opt-in request IDs, strict bounded JSON decoding, an explicit JSON API 404, and the
   standard `{"error":"..."}` shape with application-owned copy and status semantics.
+- `frontendregistry`: a checked source installer for the React/Vite shell, same-origin JSON client,
+  and PWA lifecycle; it shares no theme or layout.
 - `memory`: the proven shared Memory service client, including the identical Cook/Watch SQLite
   cache, durable outbox, and conflict behavior.
 - `server`: explicit HTTP server limits, shallow process health, and graceful context-driven
@@ -20,6 +22,8 @@ The initial packages are:
 There is intentionally no app object, router, ORM, repository layer, generic worker, deployment
 runtime, generated API contract layer, or shared visual system. The bounded Read-like generation
 experiment and rejection are recorded in [docs/api-contract-generation.md](docs/api-contract-generation.md).
+The source registry workflow and its deliberate non-abstractions are documented in
+[docs/frontend-registry.md](docs/frontend-registry.md).
 
 ## Minimal use
 

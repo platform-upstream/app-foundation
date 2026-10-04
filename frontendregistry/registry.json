@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "modules": {
+    "api": {
+      "description": "Same-origin JSON client with the standard error envelope and an injected auth-expiry hook."
+    },
+    "pwa": {
+      "description": "Network-first service worker and update registration that exclude API, internal, and Cloudflare Access paths."
+    },
+    "template": {
+      "description": "Minimal React/Vite application shell with app-owned content, theme, query policy, and layout.",
+      "requires": ["pwa"]
+    }
+  },
+  "files": [
+    { "module": "api", "source": "sources/api/api.ts", "target": "src/foundation/api.ts" },
+    { "module": "pwa", "source": "sources/pwa/register-service-worker.ts", "target": "src/foundation/register-service-worker.ts" },
+    { "module": "pwa", "source": "sources/pwa/sw.js", "target": "public/sw.js" },
+    { "module": "template", "source": "sources/template/package.json", "target": "package.json" },
+    { "module": "template", "source": "sources/template/pnpm-lock.yaml", "target": "pnpm-lock.yaml" },
+    { "module": "template", "source": "sources/template/tsconfig.json", "target": "tsconfig.json" },
+    { "module": "template", "source": "sources/template/vite.config.ts", "target": "vite.config.ts" },
+    { "module": "template", "source": "sources/template/index.html", "target": "index.html" },
+    { "module": "template", "source": "sources/template/manifest.webmanifest", "target": "public/manifest.webmanifest" },
+    { "module": "template", "source": "sources/template/main.tsx", "target": "src/main.tsx" },
+    { "module": "template", "source": "sources/template/vite-env.d.ts", "target": "src/vite-env.d.ts" },
+    { "module": "template", "source": "sources/template/App.tsx", "target": "src/App.tsx" },
+    { "module": "template", "source": "sources/template/app.css", "target": "src/app.css" }
+  ]
+}
