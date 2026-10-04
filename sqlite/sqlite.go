@@ -15,12 +15,15 @@ import (
 	"strings"
 	"time"
 
-	_ "modernc.org/sqlite"
+	modernsqlite "modernc.org/sqlite"
 )
 
 const migrationTable = "app_schema_migrations"
 
-var migrationName = regexp.MustCompile(`^([0-9]+)_([a-z0-9][a-z0-9_-]*)\.sql$`)
+var (
+	migrationName  = regexp.MustCompile(`^([0-9]+)_([a-z0-9][a-z0-9_-]*)\.sql$`)
+	migrationLabel = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
+)
 
 // Options bounds SQLite resources. Zero values select the platform defaults.
 type Options struct {
@@ -28,6 +31,9 @@ type Options struct {
 	CacheSizeKiB int
 	MaxOpenConns int
 	MaxIdleConns int
+	// Immutable is only valid with OpenReadOnly and only for isolated, self-contained snapshots
+	// that cannot have a live WAL. It maps to SQLite's immutable URI option.
+	Immutable bool
 }
 
 // Migration is one ordered forward-only schema change.
@@ -40,18 +46,45 @@ type Migration struct {
 // Open creates the parent directory, opens SQLite with explicit pragmas, verifies connectivity,
 // and bounds the connection pool. The caller owns Close.
 func Open(ctx context.Context, path string, options Options) (*sql.DB, error) {
+	if options.Immutable {
+		return nil, errors.New("immutable mode requires OpenReadOnly")
+	}
+	return open(ctx, path, options, false)
+}
+
+// OpenReadOnly opens an existing ordinary filesystem path with SQLite mode=ro and query_only=ON.
+// Immutable may be selected only for an isolated snapshot that cannot have a live WAL.
+func OpenReadOnly(ctx context.Context, path string, options Options) (*sql.DB, error) {
+	if path == ":memory:" || strings.HasPrefix(path, "file:") {
+		return nil, errors.New("read-only SQLite requires an ordinary filesystem path")
+	}
+	if strings.ContainsAny(path, "?#") {
+		return nil, errors.New("read-only SQLite path may not contain '?' or '#'")
+	}
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("resolve read-only SQLite path: %w", err)
+	}
+	dsn := "file:" + filepath.ToSlash(absolute) + "?mode=ro"
+	if options.Immutable {
+		dsn += "&immutable=1"
+	}
+	return open(ctx, dsn, options, true)
+}
+
+func open(ctx context.Context, path string, options Options, readOnly bool) (*sql.DB, error) {
 	if path == "" {
 		return nil, errors.New("SQLite path is empty")
 	}
 	if err := applyDefaults(&options); err != nil {
 		return nil, err
 	}
-	if !strings.HasPrefix(path, "file:") && path != ":memory:" {
+	if !readOnly && !strings.HasPrefix(path, "file:") && path != ":memory:" {
 		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 			return nil, fmt.Errorf("create SQLite directory: %w", err)
 		}
 	}
-	dsn := pragmaDSN(path, options)
+	dsn := pragmaDSN(path, options, readOnly)
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open SQLite: %w", err)
@@ -69,6 +102,16 @@ func Open(ctx context.Context, path string, options Options) (*sql.DB, error) {
 			return nil, fmt.Errorf("verify SQLite foreign keys: %w", err)
 		}
 		return nil, errors.New("SQLite foreign keys are disabled")
+	}
+	if readOnly {
+		var queryOnly int
+		if err := db.QueryRowContext(ctx, "PRAGMA query_only").Scan(&queryOnly); err != nil || queryOnly != 1 {
+			db.Close()
+			if err != nil {
+				return nil, fmt.Errorf("verify SQLite query-only mode: %w", err)
+			}
+			return nil, errors.New("SQLite query-only mode is disabled")
+		}
 	}
 	return db, nil
 }
@@ -92,17 +135,138 @@ func applyDefaults(options *Options) error {
 	return nil
 }
 
-func pragmaDSN(path string, options Options) string {
+func pragmaDSN(path string, options Options, readOnly bool) string {
 	separator := "?"
 	if strings.Contains(path, "?") {
 		separator = "&"
 	}
 	busyMilliseconds := options.BusyTimeout.Milliseconds()
-	return path + separator +
-		"_pragma=journal_mode(WAL)" +
-		"&_pragma=foreign_keys(1)" +
+	pragmas := "_pragma=foreign_keys(1)" +
 		"&_pragma=busy_timeout(" + strconv.FormatInt(busyMilliseconds, 10) + ")" +
 		"&_pragma=cache_size(-" + strconv.Itoa(options.CacheSizeKiB) + ")"
+	if readOnly {
+		pragmas += "&_pragma=query_only(1)"
+	} else {
+		pragmas = "_pragma=journal_mode(WAL)&" + pragmas
+	}
+	return path + separator + pragmas
+}
+
+// Snapshot writes a consistent online-backup copy of the live database to a new path. It never
+// overwrites an existing destination. The caller must provide a context with an appropriate
+// deadline because snapshot duration depends on database size and concurrent transactions.
+func Snapshot(ctx context.Context, db *sql.DB, destination string) error {
+	if db == nil {
+		return errors.New("SQLite database is nil")
+	}
+	if destination == "" || strings.HasPrefix(destination, "file:") || destination == ":memory:" || strings.ContainsAny(destination, "?#") {
+		return errors.New("snapshot destination must be an ordinary filesystem path")
+	}
+	absolute, err := filepath.Abs(destination)
+	if err != nil {
+		return fmt.Errorf("resolve SQLite snapshot destination: %w", err)
+	}
+	if _, err := os.Lstat(absolute); err == nil {
+		return errors.New("SQLite snapshot destination already exists")
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("inspect SQLite snapshot destination: %w", err)
+	}
+	parent := filepath.Dir(absolute)
+	if err := os.MkdirAll(parent, 0o700); err != nil {
+		return fmt.Errorf("create SQLite snapshot directory: %w", err)
+	}
+	temporary, err := os.CreateTemp(parent, ".app-snapshot-*.sqlite")
+	if err != nil {
+		return fmt.Errorf("create SQLite snapshot temporary file: %w", err)
+	}
+	temporaryPath := temporary.Name()
+	if err := temporary.Close(); err != nil {
+		_ = os.Remove(temporaryPath)
+		return fmt.Errorf("close SQLite snapshot temporary file: %w", err)
+	}
+	defer os.Remove(temporaryPath)
+
+	if err := copySnapshot(ctx, db, temporaryPath); err != nil {
+		return fmt.Errorf("create SQLite snapshot: %w", err)
+	}
+	if err := verifySnapshot(ctx, temporaryPath); err != nil {
+		return err
+	}
+	file, err := os.Open(temporaryPath)
+	if err != nil {
+		return fmt.Errorf("open SQLite snapshot for sync: %w", err)
+	}
+	if err := file.Sync(); err != nil {
+		file.Close()
+		return fmt.Errorf("sync SQLite snapshot: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("close SQLite snapshot: %w", err)
+	}
+	if err := os.Link(temporaryPath, absolute); err != nil {
+		return fmt.Errorf("publish SQLite snapshot: %w", err)
+	}
+	directory, err := os.Open(parent)
+	if err != nil {
+		return fmt.Errorf("open SQLite snapshot directory: %w", err)
+	}
+	if err := directory.Sync(); err != nil {
+		directory.Close()
+		return fmt.Errorf("sync SQLite snapshot directory: %w", err)
+	}
+	if err := directory.Close(); err != nil {
+		return fmt.Errorf("close SQLite snapshot directory: %w", err)
+	}
+	return nil
+}
+
+func copySnapshot(ctx context.Context, db *sql.DB, destination string) error {
+	source, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+	return source.Raw(func(driverConnection any) (finalErr error) {
+		backuper, ok := driverConnection.(interface {
+			NewBackup(string) (*modernsqlite.Backup, error)
+		})
+		if !ok {
+			return errors.New("SQLite driver does not support online backup")
+		}
+		backup, err := backuper.NewBackup(destination)
+		if err != nil {
+			return err
+		}
+		defer func() { finalErr = errors.Join(finalErr, backup.Finish()) }()
+		for {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			more, err := backup.Step(128)
+			if err != nil {
+				return err
+			}
+			if !more {
+				return nil
+			}
+		}
+	})
+}
+
+func verifySnapshot(ctx context.Context, path string) error {
+	db, err := OpenReadOnly(ctx, path, Options{Immutable: true})
+	if err != nil {
+		return fmt.Errorf("open SQLite snapshot for verification: %w", err)
+	}
+	defer db.Close()
+	var result string
+	if err := db.QueryRowContext(ctx, "PRAGMA integrity_check").Scan(&result); err != nil {
+		return fmt.Errorf("verify SQLite snapshot integrity: %w", err)
+	}
+	if result != "ok" {
+		return fmt.Errorf("verify SQLite snapshot integrity: %s", result)
+	}
+	return nil
 }
 
 // LoadMigrations reads files named <version>_<name>.sql from an embedded or ordinary filesystem.
@@ -154,6 +318,9 @@ func ApplyMigrations(ctx context.Context, db *sql.DB, migrations []Migration) er
 	if db == nil {
 		return errors.New("SQLite database is nil")
 	}
+	if err := validateMigrations(migrations); err != nil {
+		return err
+	}
 	if _, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS `+migrationTable+` (
 		version INTEGER PRIMARY KEY,
 		name TEXT NOT NULL,
@@ -182,19 +349,22 @@ func ApplyMigrations(ctx context.Context, db *sql.DB, migrations []Migration) er
 	if err := rows.Close(); err != nil {
 		return fmt.Errorf("close migration state: %w", err)
 	}
-
-	lastVersion := 0
-	seen := map[int]bool{}
+	expected := make(map[int]string, len(migrations))
 	for _, migration := range migrations {
-		if migration.Version < 1 || migration.Name == "" || strings.TrimSpace(migration.SQL) == "" || seen[migration.Version] || migration.Version < lastVersion {
-			return fmt.Errorf("invalid or unordered migration %d_%s", migration.Version, migration.Name)
+		expected[migration.Version] = migration.Name
+	}
+	for version, name := range applied {
+		expectedName, ok := expected[version]
+		if !ok {
+			return fmt.Errorf("applied migration %d_%s is missing from the migration set", version, name)
 		}
-		seen[migration.Version] = true
-		lastVersion = migration.Version
-		if oldName, ok := applied[migration.Version]; ok {
-			if oldName != migration.Name {
-				return fmt.Errorf("migration %d was applied as %q, not %q", migration.Version, oldName, migration.Name)
-			}
+		if expectedName != name {
+			return fmt.Errorf("migration %d was applied as %q, not %q", version, name, expectedName)
+		}
+	}
+
+	for _, migration := range migrations {
+		if _, ok := applied[migration.Version]; ok {
 			continue
 		}
 		tx, err := db.BeginTx(ctx, nil)
@@ -212,6 +382,19 @@ func ApplyMigrations(ctx context.Context, db *sql.DB, migrations []Migration) er
 		if err := tx.Commit(); err != nil {
 			return fmt.Errorf("commit migration %d_%s: %w", migration.Version, migration.Name, err)
 		}
+	}
+	return nil
+}
+
+func validateMigrations(migrations []Migration) error {
+	lastVersion := 0
+	seen := map[int]bool{}
+	for _, migration := range migrations {
+		if migration.Version < 1 || !migrationLabel.MatchString(migration.Name) || strings.TrimSpace(migration.SQL) == "" || seen[migration.Version] || migration.Version < lastVersion {
+			return fmt.Errorf("invalid or unordered migration %d_%s", migration.Version, migration.Name)
+		}
+		seen[migration.Version] = true
+		lastVersion = migration.Version
 	}
 	return nil
 }

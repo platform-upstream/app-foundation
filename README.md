@@ -11,7 +11,8 @@ The initial packages are:
   standard `{"error":"..."}` shape with application-owned copy and status semantics.
 - `server`: explicit HTTP server limits, shallow process health, and graceful context-driven
   shutdown with a bounded deadline.
-- `sqlite`: bounded pure-Go SQLite setup and ordered embedded transactional migrations.
+- `sqlite`: bounded pure-Go SQLite setup, explicit read-only operation, consistent snapshots, and
+  ordered embedded transactional migrations.
 - `web`: embedded SPA/static serving with safe fallback and cache rules.
 
 There is intentionally no app object, router, ORM, repository layer, worker, LLM client, Memory
@@ -76,6 +77,17 @@ origin checks accept the configured external origins or the direct request origi
 duplicate browser headers, and continue to accept missing `Origin` unless `Sec-Fetch-Site` says
 `cross-site`, matching the proven Read and Cook behavior. Authorization policy, internal-service
 credentials, rejection headers/copy, and CSP remain application-owned.
+
+SQLite defaults to WAL, foreign keys, a five-second busy timeout, a 4 MiB page cache, and one
+open/idle connection. `OpenReadOnly` accepts an ordinary existing path, adds `mode=ro`, and enforces
+`query_only`; `Immutable` is reserved for isolated self-contained snapshots with no live WAL.
+Migration files use `<version>_<lowercase-name>.sql`; applied files are forward-only and may not be
+removed or renamed. Each pending migration and its state row commit in one transaction. `Snapshot`
+uses SQLite's online backup API to capture committed live/WAL content consistently without changing
+implicit row IDs, verifies integrity, syncs the result, and atomically publishes only to a
+destination that does not exist. Callers own
+snapshot retention and must supply a context deadline. Schemas, migration SQL, portable exports,
+restore policy, and destructive-migration approval remain application-owned.
 
 ## Private-module consumption
 
