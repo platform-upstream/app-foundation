@@ -12,6 +12,7 @@ import (
 	"mime"
 	"net/http"
 	"regexp"
+	"strings"
 )
 
 const (
@@ -129,8 +130,21 @@ func SameOrigin(allowedOrigins []string, reject OriginRejectFunc) func(http.Hand
 				next.ServeHTTP(w, r)
 				return
 			}
-			origin := r.Header.Get("Origin")
-			if r.Header.Get("Sec-Fetch-Site") == "cross-site" || (origin != "" && origin != directOrigin(r) && !allowed[origin]) {
+			origins := r.Header.Values("Origin")
+			fetchSites := r.Header.Values("Sec-Fetch-Site")
+			if len(origins) > 1 || len(fetchSites) > 1 {
+				reject(w, r)
+				return
+			}
+			origin := ""
+			if len(origins) == 1 {
+				origin = origins[0]
+			}
+			fetchSite := ""
+			if len(fetchSites) == 1 {
+				fetchSite = fetchSites[0]
+			}
+			if fetchSite == "cross-site" || (origin != "" && origin != directOrigin(r) && !allowed[origin]) {
 				reject(w, r)
 				return
 			}
@@ -140,6 +154,9 @@ func SameOrigin(allowedOrigins []string, reject OriginRejectFunc) func(http.Hand
 }
 
 func directOrigin(r *http.Request) string {
+	if r.Host == "" || strings.ContainsAny(r.Host, "/?#@") {
+		return ""
+	}
 	scheme := "http"
 	if r.TLS != nil {
 		scheme = "https"

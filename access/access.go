@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 )
@@ -17,7 +18,7 @@ const (
 	maxAssertionSize = 16_000
 )
 
-var teamDomainPattern = regexp.MustCompile(`^[a-z0-9-]+\.cloudflareaccess\.com$`)
+var teamDomainPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.cloudflareaccess\.com$`)
 
 var (
 	ErrMissingAssertion  = errors.New("Cloudflare Access assertion is missing")
@@ -67,7 +68,7 @@ func New(cfg Config) (*Authenticator, error) {
 		}
 		return &Authenticator{local: true}, nil
 	case ModeCloudflare:
-		if !validTeamDomain(cfg.TeamDomain) || cfg.Audience == "" {
+		if !validTeamDomain(cfg.TeamDomain) || cfg.Audience == "" || strings.TrimSpace(cfg.Audience) != cfg.Audience {
 			return nil, errors.New("valid Cloudflare team domain and audience are required")
 		}
 		issuer := "https://" + cfg.TeamDomain
@@ -97,10 +98,14 @@ func (a *Authenticator) Authenticate(r *http.Request) error {
 		}
 		return nil
 	}
-	raw := r.Header.Get(AssertionHeader)
-	if raw == "" {
+	assertions := r.Header.Values(AssertionHeader)
+	if len(assertions) == 0 || (len(assertions) == 1 && assertions[0] == "") {
 		return ErrMissingAssertion
 	}
+	if len(assertions) != 1 {
+		return ErrInvalidAssertion
+	}
+	raw := assertions[0]
 	if len(raw) > maxAssertionSize {
 		return ErrAssertionTooLarge
 	}
@@ -111,7 +116,7 @@ func (a *Authenticator) Authenticate(r *http.Request) error {
 	var claims struct {
 		IssuedAt int64 `json:"iat"`
 	}
-	if err := token.Claims(&claims); err != nil || token.Subject == "" || claims.IssuedAt == 0 {
+	if err := token.Claims(&claims); err != nil || token.Subject == "" || token.Expiry.IsZero() || claims.IssuedAt == 0 {
 		return ErrInvalidAssertion
 	}
 	return nil

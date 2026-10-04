@@ -68,6 +68,15 @@ handler; applications may expose a separate readiness endpoint when a real consu
 The legacy `Health(check)` call shape still compiles for `v0.1.0` consumers, but checks are ignored;
 use an application-owned readiness route if dependency state genuinely needs to affect routing.
 
+Cloudflare mode verifies one bounded `Cf-Access-Jwt-Assertion`, RS256, issuer, audience, expiry,
+issued-at, and subject against a bounded/cached JWKS fetch. It deliberately returns only success or
+an error: current consumers use Access as an owner gate and do not share an identity model. Local
+mode still requires the literal `127.0.0.1` listener and checks the actual request peer. Mutation
+origin checks accept the configured external origins or the direct request origin, reject ambiguous
+duplicate browser headers, and continue to accept missing `Origin` unless `Sec-Fetch-Site` says
+`cross-site`, matching the proven Read and Cook behavior. Authorization policy, internal-service
+credentials, rejection headers/copy, and CSP remain application-owned.
+
 ## Private-module consumption
 
 Developers and release automation that resolve the private module need GitHub authentication and:

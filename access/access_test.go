@@ -53,6 +53,9 @@ func TestCloudflareGate(t *testing.T) {
 		{"missing issued-at", sign(t, key, kid, map[string]any{
 			"iss": issuer, "aud": aud, "sub": "owner", "exp": time.Now().Add(5 * time.Minute).Unix(),
 		})},
+		{"missing expiry", sign(t, key, kid, map[string]any{
+			"iss": issuer, "aud": aud, "sub": "owner", "iat": time.Now().Unix(),
+		})},
 		{"wrong issuer", mint(t, key, kid, "https://evil.example", aud, "owner", time.Now())},
 	}
 	for _, tc := range invalidClaims {
@@ -71,6 +74,10 @@ func TestCloudflareGate(t *testing.T) {
 	req.Header.Set(AssertionHeader, strings.Repeat("x", maxAssertionSize+1))
 	if err := auth.Authenticate(req); !errors.Is(err, ErrAssertionTooLarge) {
 		t.Fatalf("oversized assertion error = %v", err)
+	}
+	req.Header[AssertionHeader] = []string{token, token}
+	if err := auth.Authenticate(req); !errors.Is(err, ErrInvalidAssertion) {
+		t.Fatalf("duplicate assertion error = %v", err)
 	}
 }
 
@@ -270,6 +277,16 @@ func TestMiddlewareGatesAndUsesAppReject(t *testing.T) {
 	}
 }
 
+func TestMiddlewareDefaultRejectUsesStandardEnvelope(t *testing.T) {
+	var auth *Authenticator
+	handler := auth.Middleware(nil)(http.NotFoundHandler())
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
+	if w.Code != http.StatusUnauthorized || w.Header().Get("Content-Type") != "application/json; charset=utf-8" || w.Body.String() != "{\"error\":\"Sign-in required.\"}\n" {
+		t.Fatalf("response = %d %q %q", w.Code, w.Header().Get("Content-Type"), w.Body.String())
+	}
+}
+
 func TestAuthenticatorZeroValuesFailClosed(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	var nilAuth *Authenticator
@@ -290,10 +307,15 @@ func TestLocalModeRequiresLoopbackListener(t *testing.T) {
 }
 
 func TestTeamDomainIsLowercaseSingleLabel(t *testing.T) {
-	if !validTeamDomain("niiku.cloudflareaccess.com") {
-		t.Fatal("valid team domain rejected")
+	for _, domain := range []string{"n.cloudflareaccess.com", "niiku.cloudflareaccess.com", strings.Repeat("a", 63) + ".cloudflareaccess.com"} {
+		if !validTeamDomain(domain) {
+			t.Errorf("valid team domain rejected: %q", domain)
+		}
 	}
 	for _, domain := range []string{
+		"-niiku.cloudflareaccess.com",
+		"niiku-.cloudflareaccess.com",
+		strings.Repeat("a", 64) + ".cloudflareaccess.com",
 		"Niiku.cloudflareaccess.com",
 		"niiku.dev.cloudflareaccess.com",
 		"niiku_test.cloudflareaccess.com",
@@ -301,6 +323,14 @@ func TestTeamDomainIsLowercaseSingleLabel(t *testing.T) {
 	} {
 		if validTeamDomain(domain) {
 			t.Errorf("invalid team domain accepted: %q", domain)
+		}
+	}
+}
+
+func TestCloudflareConfigRejectsWhitespaceAudience(t *testing.T) {
+	for _, audience := range []string{"", " audience", "audience ", "\taudience"} {
+		if _, err := New(Config{Mode: ModeCloudflare, TeamDomain: "niiku.cloudflareaccess.com", Audience: audience}); err == nil {
+			t.Errorf("New accepted audience %q", audience)
 		}
 	}
 }

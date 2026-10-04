@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"crypto/tls"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -106,24 +107,60 @@ func TestSameOrigin(t *testing.T) {
 	}))
 	for _, tc := range []struct {
 		name, method, origin, fetchSite string
+		tls                             bool
 		want                            int
 	}{
-		{"read bypass", http.MethodGet, "https://evil.example", "cross-site", 204},
-		{"production", http.MethodPost, "https://read.niiku.xyz", "same-origin", 204},
-		{"development proxy", http.MethodPost, "https://code.niiku.xyz", "same-site", 204},
-		{"direct loopback", http.MethodPost, "http://127.0.0.1:8096", "same-origin", 204},
-		{"cross site", http.MethodPost, "https://evil.example", "cross-site", 403},
-		{"origin mismatch", http.MethodPost, "https://evil.example", "same-site", 403},
+		{"read bypass", http.MethodGet, "https://evil.example", "cross-site", false, 204},
+		{"production", http.MethodPost, "https://read.niiku.xyz", "same-origin", false, 204},
+		{"development proxy", http.MethodPost, "https://code.niiku.xyz", "same-site", false, 204},
+		{"direct loopback", http.MethodPost, "http://127.0.0.1:8096", "same-origin", false, 204},
+		{"direct TLS", http.MethodPost, "https://127.0.0.1:8096", "same-origin", true, 204},
+		{"missing origin", http.MethodPost, "", "none", false, 204},
+		{"cross site", http.MethodPost, "https://evil.example", "cross-site", false, 403},
+		{"allowed but cross site", http.MethodPost, "https://read.niiku.xyz", "cross-site", false, 403},
+		{"origin mismatch", http.MethodPost, "https://evil.example", "same-site", false, 403},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := httptest.NewRequest(tc.method, "http://127.0.0.1:8096/api/items", nil)
 			r.Header.Set("Origin", tc.origin)
 			r.Header.Set("Sec-Fetch-Site", tc.fetchSite)
+			if tc.tls {
+				r.TLS = &tls.ConnectionState{}
+			}
 			w := httptest.NewRecorder()
 			handler.ServeHTTP(w, r)
 			if w.Code != tc.want {
 				t.Fatalf("status = %d, want %d; body=%q", w.Code, tc.want, w.Body.String())
 			}
 		})
+	}
+}
+
+func TestSameOriginRejectsAmbiguousBrowserHeaders(t *testing.T) {
+	handler := SameOrigin(nil, nil)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	for _, header := range []string{"Origin", "Sec-Fetch-Site"} {
+		r := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8096/api/items", nil)
+		r.Header[header] = []string{"same-origin", "cross-site"}
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, r)
+		if w.Code != http.StatusForbidden {
+			t.Errorf("duplicate %s status = %d, want %d", header, w.Code, http.StatusForbidden)
+		}
+	}
+}
+
+func TestSameOriginRejectsMalformedDirectHost(t *testing.T) {
+	handler := SameOrigin(nil, nil)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	r := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8096/api/items", nil)
+	r.Host = ""
+	r.Header.Set("Origin", "http://")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusForbidden)
 	}
 }
