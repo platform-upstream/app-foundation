@@ -89,6 +89,21 @@ destination that does not exist. Callers own
 snapshot retention and must supply a context deadline. Schemas, migration SQL, portable exports,
 restore policy, and destructive-migration approval remain application-owned.
 
+`web.Handler` serves a Vite-style embedded filesystem with Read's verified cache contract:
+documents and ordinary files are `no-store`, `sw.js` and `manifest.webmanifest` revalidate, and
+`/assets/` files are immutable for one year. Extensionless missing paths fall back to `index.html`;
+missing assets, file-like paths, `/api/*`, and `/internal/*` return non-cacheable 404s. The API mux
+still owns the JSON error response. Filesystem failures return 500 rather than silently booting the
+SPA. Console's broader `no-cache` document policy is not generalized until another consumer needs
+it, and CSP/security headers remain app-owned.
+
+Authentication must wrap the web handler so a signed-out document reaches Cloudflare Access rather
+than receiving the embedded shell. The frontend service worker must register network-first
+navigations before its precache route, use the cached shell only for ordinary offline navigation,
+never fall back for a reauthentication navigation, and never cache `/api/`, `/internal/`, or
+`/cdn-cgi/` responses. Those browser behaviors are installed as source by the frontend registry;
+they are not hidden inside this Go handler.
+
 ## Private-module consumption
 
 Developers and release automation that resolve the private module need GitHub authentication and:

@@ -28,13 +28,14 @@ func Handler(fsys fs.FS) (http.Handler, error) {
 	files := http.FileServerFS(fsys)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("Allow", "GET, HEAD")
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 			return
 		}
 		cleaned := path.Clean("/" + strings.TrimPrefix(r.URL.Path, "/"))
 		if cleaned == "/api" || strings.HasPrefix(cleaned, "/api/") || cleaned == "/internal" || strings.HasPrefix(cleaned, "/internal/") {
-			http.NotFound(w, r)
+			notFound(w, r)
 			return
 		}
 		relative := strings.TrimPrefix(cleaned, "/")
@@ -45,8 +46,12 @@ func Handler(fsys fs.FS) (http.Handler, error) {
 
 		file, err := fsys.Open(relative)
 		if err != nil {
+			if !errors.Is(err, fs.ErrNotExist) {
+				internalError(w)
+				return
+			}
 			if strings.HasPrefix(cleaned, "/assets/") || path.Ext(cleaned) != "" {
-				http.NotFound(w, r)
+				notFound(w, r)
 				return
 			}
 			serveIndex(w, r, index)
@@ -54,9 +59,13 @@ func Handler(fsys fs.FS) (http.Handler, error) {
 		}
 		info, statErr := file.Stat()
 		_ = file.Close()
-		if statErr != nil || info.IsDir() {
+		if statErr != nil {
+			internalError(w)
+			return
+		}
+		if info.IsDir() {
 			if strings.HasPrefix(cleaned, "/assets/") {
-				http.NotFound(w, r)
+				notFound(w, r)
 				return
 			}
 			serveIndex(w, r, index)
@@ -73,8 +82,19 @@ func Handler(fsys fs.FS) (http.Handler, error) {
 		}
 		clone := r.Clone(r.Context())
 		clone.URL.Path = cleaned
+		clone.URL.RawPath = ""
 		files.ServeHTTP(w, clone)
 	}), nil
+}
+
+func notFound(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	http.NotFound(w, r)
+}
+
+func internalError(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", "no-store")
+	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 }
 
 func serveIndex(w http.ResponseWriter, r *http.Request, index []byte) {
