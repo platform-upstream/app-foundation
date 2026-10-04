@@ -9,21 +9,22 @@ export function registerServiceWorker(options: ServiceWorkerUpdates = {}): () =>
   let disposed = false;
   let hadController = Boolean(navigator.serviceWorker.controller);
   const reload = options.reload ?? (() => location.reload());
-  const scriptURL = new URL('sw.js', document.baseURI);
+  const origin = location.origin;
+  const scriptURL = new URL('/sw.js', origin);
   const bootModule = import.meta.url;
 
   const update = async () => {
     try {
       const registration = await navigator.serviceWorker.register(scriptURL, { updateViaCache: 'none' });
       await registration.update();
-      const response = await fetch(new URL('./', document.baseURI), {
+      const response = await fetch(new URL('/', origin), {
         cache: 'no-store',
         credentials: 'same-origin',
       });
       if (!response.ok || response.redirected) return;
       const documentCopy = new DOMParser().parseFromString(await response.text(), 'text/html');
       const entry = documentCopy.querySelector<HTMLScriptElement>('script[type="module"][src]')?.getAttribute('src');
-      if (!disposed && entry && new URL(entry, document.baseURI).href !== bootModule) reload();
+      if (!disposed && entry && new URL(entry, origin).href !== bootModule) reload();
     } catch (error) {
       options.onUpdateError?.(error);
     }

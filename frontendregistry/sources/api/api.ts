@@ -36,7 +36,7 @@ function errorMessage(value: unknown, fallback: string): string {
 }
 
 export function createJSONClient(options: JSONClientOptions = {}): JSONRequest {
-  const baseURL = options.baseURL ?? new URL('api/', document.baseURI);
+  const baseURL = options.baseURL ?? new URL('/api/', location.origin);
   const fallback = options.fallbackMessage ?? 'The action could not be completed.';
   const isAuthRequired = options.isAuthRequired ?? defaultAuthRequired;
 

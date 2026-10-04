@@ -3,6 +3,7 @@ package frontendregistry
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -73,6 +74,24 @@ func TestTemplateIncludesRequiredPWAModule(t *testing.T) {
 	for _, name := range []string{"package.json", "public/sw.js", "src/foundation/register-service-worker.ts"} {
 		if _, err := os.Stat(filepath.Join(target, filepath.FromSlash(name))); err != nil {
 			t.Fatalf("required template file %q: %v", name, err)
+		}
+	}
+	if err := registry.Install(target, "api"); err != nil {
+		t.Fatal(err)
+	}
+	for name, required := range map[string]string{
+		"vite.config.ts":                            "base: '/'",
+		"index.html":                                `href="/manifest.webmanifest"`,
+		"public/manifest.webmanifest":               `"start_url": "/"`,
+		"src/foundation/api.ts":                     "new URL('/api/', location.origin)",
+		"src/foundation/register-service-worker.ts": "new URL('/sw.js', origin)",
+	} {
+		contents, err := os.ReadFile(filepath.Join(target, filepath.FromSlash(name)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(contents), required) {
+			t.Fatalf("%s does not contain root-origin contract %q", name, required)
 		}
 	}
 }

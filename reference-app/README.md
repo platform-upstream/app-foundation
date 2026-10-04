@@ -26,8 +26,9 @@ GOWORK=off go build -trimpath -ldflags='-s -w' -o .local/foundation-reference ./
 APP_DB=.local/reference.sqlite ./.local/foundation-reference
 ```
 
-The safe default is loopback-only local auth at `127.0.0.1:8099`. From this workstation the human
-preview is `https://code.niiku.xyz/proxy/8099/`.
+The safe default is loopback-only local auth at `127.0.0.1:8099`. The app intentionally uses a
+root-relative production asset base so direct SPA routes work; from this workstation the human
+preview therefore uses `https://code.niiku.xyz/absproxy/8099/`.
 
 Cloudflare mode requires all three external values and protects both documents and APIs while
 leaving the shallow process health endpoint public:
