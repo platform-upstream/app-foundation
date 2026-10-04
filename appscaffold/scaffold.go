@@ -8,9 +8,10 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/niiku-platform/app-foundation/internal/sourcetree"
 )
 
 //go:embed all:files
@@ -56,14 +57,24 @@ func Generate(target string, options Options) error {
 		"__APP_NAME__", options.Name,
 		"__IMAGE_REPOSITORY__", options.ImageRepository,
 	)
+	if err := os.MkdirAll(target, 0o755); err != nil {
+		return fmt.Errorf("create app scaffold target: %w", err)
+	}
+	tree, err := sourcetree.Open(target)
+	if err != nil {
+		return fmt.Errorf("open app scaffold target: %w", err)
+	}
+	defer tree.Close()
 	type output struct {
 		name string
 		data []byte
 	}
 	outputs := make([]output, 0, len(templateFiles))
 	for _, name := range templateFiles {
-		destination := filepath.Join(target, filepath.FromSlash(name))
-		if _, err := os.Lstat(destination); err == nil {
+		if err := tree.CheckParents(name); err != nil {
+			return fmt.Errorf("inspect app scaffold target %q: %w", name, err)
+		}
+		if _, err := tree.Lstat(name); err == nil {
 			return fmt.Errorf("app scaffold target %q already exists", name)
 		} else if !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("inspect app scaffold target %q: %w", name, err)
@@ -76,41 +87,12 @@ func Generate(target string, options Options) error {
 		if strings.Contains(rendered, "__APP_NAME__") || strings.Contains(rendered, "__IMAGE_REPOSITORY__") {
 			return fmt.Errorf("unresolved app scaffold placeholder in %q", name)
 		}
-		outputs = append(outputs, output{name: destination, data: []byte(rendered)})
+		outputs = append(outputs, output{name: name, data: []byte(rendered)})
 	}
 	for index, item := range outputs {
-		if err := atomicWrite(item.name, item.data); err != nil {
+		if err := tree.AtomicWrite(item.name, item.data); err != nil {
 			return fmt.Errorf("write app scaffold target %q: %w", templateFiles[index], err)
 		}
 	}
 	return nil
-}
-
-func atomicWrite(destination string, data []byte) error {
-	directory := filepath.Dir(destination)
-	if err := os.MkdirAll(directory, 0o755); err != nil {
-		return err
-	}
-	temporary, err := os.CreateTemp(directory, ".app-scaffold-*")
-	if err != nil {
-		return err
-	}
-	temporaryName := temporary.Name()
-	defer func() {
-		_ = temporary.Close()
-		_ = os.Remove(temporaryName)
-	}()
-	if err := temporary.Chmod(0o644); err != nil {
-		return err
-	}
-	if _, err := temporary.Write(data); err != nil {
-		return err
-	}
-	if err := temporary.Sync(); err != nil {
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	return os.Rename(temporaryName, destination)
 }

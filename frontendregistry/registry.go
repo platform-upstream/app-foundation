@@ -11,9 +11,10 @@ import (
 	"io/fs"
 	"os"
 	"path"
-	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/niiku-platform/app-foundation/internal/sourcetree"
 )
 
 //go:embed registry.json sources
@@ -107,13 +108,27 @@ func (registry *Registry) Check(target string, modules ...string) ([]Difference,
 	if err != nil {
 		return nil, err
 	}
+	if _, err := os.Lstat(target); errors.Is(err, os.ErrNotExist) {
+		differences := make([]Difference, 0, len(files))
+		for _, file := range files {
+			differences = append(differences, Difference{Target: file.Target, Reason: "missing"})
+		}
+		return differences, nil
+	} else if err != nil {
+		return nil, fmt.Errorf("inspect frontend registry target: %w", err)
+	}
+	tree, err := sourcetree.Open(target)
+	if err != nil {
+		return nil, fmt.Errorf("open frontend registry target: %w", err)
+	}
+	defer tree.Close()
 	var differences []Difference
 	for _, file := range files {
 		expected, err := fs.ReadFile(content, file.Source)
 		if err != nil {
 			return nil, fmt.Errorf("read registry source %q: %w", file.Source, err)
 		}
-		actual, err := os.ReadFile(filepath.Join(target, filepath.FromSlash(file.Target)))
+		actual, err := tree.ReadFile(file.Target)
 		switch {
 		case errors.Is(err, os.ErrNotExist):
 			differences = append(differences, Difference{Target: file.Target, Reason: "missing"})
@@ -134,10 +149,17 @@ func (registry *Registry) write(target string, overwrite bool, modules ...string
 	if target == "" {
 		return errors.New("frontend registry target is required")
 	}
+	if err := os.MkdirAll(target, 0o755); err != nil {
+		return fmt.Errorf("create frontend registry target: %w", err)
+	}
+	tree, err := sourcetree.Open(target)
+	if err != nil {
+		return fmt.Errorf("open frontend registry target: %w", err)
+	}
+	defer tree.Close()
 	type pendingFile struct {
-		file        File
-		data        []byte
-		destination string
+		file File
+		data []byte
 	}
 	pending := make([]pendingFile, 0, len(files))
 	for _, file := range files {
@@ -145,9 +167,11 @@ func (registry *Registry) write(target string, overwrite bool, modules ...string
 		if err != nil {
 			return fmt.Errorf("read registry source %q: %w", file.Source, err)
 		}
-		destination := filepath.Join(target, filepath.FromSlash(file.Target))
+		if err := tree.CheckParents(file.Target); err != nil {
+			return fmt.Errorf("inspect target %q: %w", file.Target, err)
+		}
 		if !overwrite {
-			actual, readErr := os.ReadFile(destination)
+			actual, readErr := tree.ReadFile(file.Target)
 			switch {
 			case readErr == nil && string(actual) == string(data):
 				continue
@@ -157,10 +181,10 @@ func (registry *Registry) write(target string, overwrite bool, modules ...string
 				return fmt.Errorf("read target %q: %w", file.Target, readErr)
 			}
 		}
-		pending = append(pending, pendingFile{file: file, data: data, destination: destination})
+		pending = append(pending, pendingFile{file: file, data: data})
 	}
 	for _, item := range pending {
-		if err := atomicWrite(item.destination, item.data); err != nil {
+		if err := tree.AtomicWrite(item.file.Target, item.data); err != nil {
 			return fmt.Errorf("write target %q: %w", item.file.Target, err)
 		}
 	}
@@ -239,35 +263,6 @@ func validateManifest(value manifest) error {
 
 func safeRelative(name string) bool {
 	return name != "" && name == path.Clean(name) && name != "." && !path.IsAbs(name) && !strings.HasPrefix(name, "../")
-}
-
-func atomicWrite(destination string, data []byte) (returnErr error) {
-	directory := filepath.Dir(destination)
-	if err := os.MkdirAll(directory, 0o755); err != nil {
-		return err
-	}
-	temporary, err := os.CreateTemp(directory, ".frontend-registry-*")
-	if err != nil {
-		return err
-	}
-	temporaryName := temporary.Name()
-	defer func() {
-		_ = temporary.Close()
-		_ = os.Remove(temporaryName)
-	}()
-	if err := temporary.Chmod(0o644); err != nil {
-		return err
-	}
-	if _, err := temporary.Write(data); err != nil {
-		return err
-	}
-	if err := temporary.Sync(); err != nil {
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	return os.Rename(temporaryName, destination)
 }
 
 // SortedModuleNames returns stable module names for command output.

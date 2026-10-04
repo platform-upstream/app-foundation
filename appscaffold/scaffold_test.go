@@ -60,3 +60,21 @@ func TestGenerateRejectsInvalidOptions(t *testing.T) {
 		}
 	}
 }
+
+func TestGenerateRejectsEscapingParentSymlink(t *testing.T) {
+	target := t.TempDir()
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(target, "deploy")); err != nil {
+		t.Fatal(err)
+	}
+	err := Generate(target, Options{Name: "reference-app", ImageRepository: "example/reference-app"})
+	if err == nil {
+		t.Fatal("generate wrote through parent symlink")
+	}
+	if _, err := os.Stat(filepath.Join(outside, "Chart.yaml")); !os.IsNotExist(err) {
+		t.Fatalf("outside file exists: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(target, "Dockerfile")); !os.IsNotExist(err) {
+		t.Fatalf("generate wrote before completing symlink preflight: %v", err)
+	}
+}

@@ -4,6 +4,8 @@
 application with an embedded React/Vite frontend. It renders once and refuses to replace any target;
 the resulting files belong to the application and are expected to diverge where its behavior needs
 different resources, secrets, networking, or release checks.
+Generation rejects symlink parents and uses root-confined atomic writes so repository contents
+cannot redirect output outside the requested target.
 
 ```bash
 go run github.com/niiku-platform/app-foundation/cmd/app-scaffold@v0.8.0 \

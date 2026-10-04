@@ -94,6 +94,34 @@ func TestInstallPreflightsBeforeWriting(t *testing.T) {
 	}
 }
 
+func TestInstallAndSyncRejectEscapingParentSymlink(t *testing.T) {
+	registry, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, operation := range []struct {
+		name string
+		run  func(string) error
+	}{
+		{name: "install", run: func(target string) error { return registry.Install(target, "api") }},
+		{name: "sync", run: func(target string) error { return registry.Sync(target, "api") }},
+	} {
+		t.Run(operation.name, func(t *testing.T) {
+			target := t.TempDir()
+			outside := t.TempDir()
+			if err := os.Symlink(outside, filepath.Join(target, "src")); err != nil {
+				t.Fatal(err)
+			}
+			if err := operation.run(target); err == nil {
+				t.Fatal("write through parent symlink succeeded")
+			}
+			if _, err := os.Stat(filepath.Join(outside, "foundation", "api.ts")); !os.IsNotExist(err) {
+				t.Fatalf("outside file exists: %v", err)
+			}
+		})
+	}
+}
+
 func TestManifestPathValidation(t *testing.T) {
 	value := manifest{
 		Version: 1,

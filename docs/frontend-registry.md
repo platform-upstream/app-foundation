@@ -18,6 +18,8 @@ go run github.com/niiku-platform/app-foundation/cmd/frontend-registry@v0.7.0 \
 lists missing or changed registry-owned files. `sync` is the explicit replacement operation; review
 its diff because it overwrites selected registry-owned source. Selecting `template` automatically
 includes its `pwa` dependency. With no module list, every module is selected.
+All reads and writes are anchored to the requested real directory, reject symlink parents, and use
+root-confined atomic replacement, so a consumer-tree symlink cannot redirect output elsewhere.
 
 The template pins the React/Vite/TypeScript/TanStack Query/Zod versions already exercised by Read,
 uses a relative Vite base for path-proxy previews, and includes a frozen pnpm lockfile. Rename the
