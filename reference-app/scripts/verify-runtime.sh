@@ -3,6 +3,7 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 binary="${1:-$root/.local/foundation-reference}"
+mkdir -p "$root/.local"
 runtime_dir="$(mktemp -d "$root/.local/runtime.XXXXXX")"
 active_pid=""
 
@@ -26,25 +27,13 @@ wait_for_health() {
   done
 }
 
-mkdir -p "$root/.local"
 if [[ ! -x "$binary" ]]; then
   echo "runtime binary is missing: $binary" >&2
   exit 1
 fi
 
-cold_ms=()
-for run in 1 2 3 4 5; do
-  port=$((18100 + run))
-  started_ns="$(date +%s%N)"
-  APP_ADDR="127.0.0.1:$port" \
-  APP_DB="$runtime_dir/cold-$run.sqlite" \
-    "$binary" >"$runtime_dir/cold-$run.log" 2>&1 &
-  active_pid=$!
-  wait_for_health "http://127.0.0.1:$port"
-  ready_ns="$(date +%s%N)"
-  cold_ms+=("$(((ready_ns - started_ns) / 1000000))")
-  stop_server
-done
+(cd "$root" && GOWORK=off go build -trimpath -o "$runtime_dir/runtimeprobe" ./tools/runtimeprobe)
+"$runtime_dir/runtimeprobe" "$binary" "$runtime_dir"
 
 port=18120
 APP_ADDR="127.0.0.1:$port" \
@@ -76,10 +65,6 @@ sleep 1
 read -r exercised_rss exercised_pss < <(awk '/^Rss:/ {rss=$2} /^Pss:/ {pss=$2} END {print rss, pss}' "/proc/$active_pid/smaps_rollup")
 stop_server
 
-printf 'cold_start_ms=%s\n' "$(IFS=,; echo "${cold_ms[*]}")"
-mapfile -t sorted_cold_ms < <(printf '%s\n' "${cold_ms[@]}" | sort -n)
-printf 'cold_start_min_ms=%s cold_start_median_ms=%s cold_start_max_ms=%s\n' \
-  "${sorted_cold_ms[0]}" "${sorted_cold_ms[2]}" "${sorted_cold_ms[4]}"
 printf 'idle_warmup_seconds=2\n'
 printf 'idle_rss_kib=%s idle_pss_kib=%s\n' "$idle_rss" "$idle_pss"
 printf 'exercised_rss_kib=%s exercised_pss_kib=%s\n' "$exercised_rss" "$exercised_pss"

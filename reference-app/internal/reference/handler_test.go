@@ -3,7 +3,10 @@ package reference
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -15,6 +18,7 @@ import (
 	"testing/fstest"
 	"time"
 
+	jose "github.com/go-jose/go-jose/v4"
 	"github.com/niiku-platform/app-foundation/access"
 	"github.com/niiku-platform/app-foundation/httpx"
 	"github.com/niiku-platform/app-foundation/memory"
@@ -143,6 +147,62 @@ func TestCloudflareModeProtectsShellButNotHealth(t *testing.T) {
 	}
 }
 
+func TestCloudflareModeAcceptsMockedValidAssertion(t *testing.T) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const (
+		keyID    = "reference-key"
+		issuer   = "https://reference.cloudflareaccess.com"
+		audience = "reference-audience"
+	)
+	keySet, err := json.Marshal(jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{
+		Key: &key.PublicKey, KeyID: keyID, Algorithm: string(jose.RS256), Use: "sig",
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if request.URL.String() != issuer+"/cdn-cgi/access/certs" {
+			t.Fatalf("JWKS URL = %s", request.URL)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(bytes.NewReader(keySet)),
+			Request:    request,
+		}, nil
+	})}
+	authenticator, err := access.New(access.Config{
+		Mode: access.ModeCloudflare, TeamDomain: "reference.cloudflareaccess.com",
+		Audience: audience, HTTPClient: client,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler, closeHandler := newTestHandlerWithAuthenticator(t, authenticator, nil, nil)
+	defer closeHandler()
+	now := time.Now()
+	token := signAssertion(t, key, keyID, map[string]any{
+		"iss": issuer, "aud": audience, "sub": "owner",
+		"iat": now.Unix(), "exp": now.Add(5 * time.Minute).Unix(),
+	})
+	request := httptest.NewRequest(http.MethodGet, "http://reference.test/", nil)
+	request.Header.Set(access.AssertionHeader, token)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "reference shell") {
+		t.Fatalf("valid assertion response = %d %s", response.Code, response.Body.String())
+	}
+	request.Header.Set(access.AssertionHeader, token+"broken")
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("invalid assertion response = %d %s", response.Code, response.Body.String())
+	}
+}
+
 func TestMemoryAndLLMSeamsUseFakeServers(t *testing.T) {
 	memoryServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/people" || r.Header.Get("Authorization") != "Bearer memory-key" {
@@ -252,7 +312,67 @@ func TestGracefulShutdownCompletesInflightRequest(t *testing.T) {
 	}
 }
 
+func TestShutdownForcesCloseAtConfiguredDeadline(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	handler := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		close(entered)
+		<-release
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	serveResult := make(chan error, 1)
+	go func() {
+		serveResult <- server.ServeWithShutdownTimeout(ctx, server.New(listener.Addr().String(), handler), listener, 30*time.Millisecond)
+	}()
+	requestResult := make(chan error, 1)
+	go func() {
+		response, err := http.Get("http://" + listener.Addr().String())
+		if err == nil {
+			defer response.Body.Close()
+			_, err = io.ReadAll(response.Body)
+		}
+		requestResult <- err
+	}()
+	select {
+	case <-entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("request did not enter handler")
+	}
+	started := time.Now()
+	cancel()
+	select {
+	case err := <-serveResult:
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("server error = %v", err)
+		}
+		if elapsed := time.Since(started); elapsed < 20*time.Millisecond || elapsed > 500*time.Millisecond {
+			t.Fatalf("forced shutdown elapsed = %v", elapsed)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("forced shutdown exceeded deadline")
+	}
+	close(release)
+	select {
+	case <-requestResult:
+	case <-time.After(time.Second):
+		t.Fatal("forced client request did not return")
+	}
+}
+
 func newTestHandler(t *testing.T, authConfig access.Config, memoryClient MemoryClient, llm CompletionClient) (http.Handler, func()) {
+	t.Helper()
+	authenticator, err := access.New(authConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return newTestHandlerWithAuthenticator(t, authenticator, memoryClient, llm)
+}
+
+func newTestHandlerWithAuthenticator(t *testing.T, authenticator *access.Authenticator, memoryClient MemoryClient, llm CompletionClient) (http.Handler, func()) {
 	t.Helper()
 	db, err := OpenStore(context.Background(), filepath.Join(t.TempDir(), "reference.sqlite"), migrations.Files)
 	if err != nil {
@@ -267,10 +387,6 @@ func newTestHandler(t *testing.T, authConfig access.Config, memoryClient MemoryC
 	if llm == nil {
 		llm = NewLLMClient("", "", nil)
 	}
-	authenticator, err := access.New(authConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
 	handler, err := NewHandler(HandlerConfig{
 		Database: db, Assets: testAssets, Authenticator: authenticator,
 		AllowedOrigins: []string{"http://reference.test"}, Memory: memoryClient, LLM: llm,
@@ -279,6 +395,34 @@ func newTestHandler(t *testing.T, authConfig access.Config, memoryClient MemoryC
 		t.Fatal(err)
 	}
 	return handler, func() { _ = db.Close() }
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (function roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return function(request)
+}
+
+func signAssertion(t *testing.T, key *rsa.PrivateKey, keyID string, claims map[string]any) string {
+	t.Helper()
+	options := (&jose.SignerOptions{}).WithHeader("kid", keyID)
+	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.RS256, Key: key}, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, err := json.Marshal(claims)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signed, err := signer.Sign(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compact, err := signed.CompactSerialize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return compact
 }
 
 func doRequest(t *testing.T, handler http.Handler, method, path, body, contentType, origin string) *httptest.ResponseRecorder {

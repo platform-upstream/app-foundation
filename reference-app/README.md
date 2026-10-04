@@ -72,4 +72,5 @@ mutation, a deep link, service-worker activation, an offline navigation with an 
 request, one cache-version update/activation, and a fresh signed-out browser against Cloudflare
 mode. Runtime measurement uses five cold starts and reads `Rss` and `Pss` from
 `/proc/<pid>/smaps_rollup` after a fixed idle warm-up and again after the representative browser
-and API sequence; it is intentionally not a load test.
+and API sequence. The cold-start helper uses Go's monotonic clock from immediately before process
+spawn to the first successful health response; the entire check is intentionally not a load test.
