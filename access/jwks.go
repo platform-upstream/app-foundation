@@ -36,6 +36,7 @@ type boundedRemoteKeySet struct {
 
 	mu          sync.Mutex
 	keys        []jose.JSONWebKey
+	generation  uint64
 	fetchedAt   time.Time
 	lastAttempt time.Time
 	lastError   error
@@ -71,10 +72,14 @@ func (r *boundedRemoteKeySet) VerifySignature(ctx context.Context, raw string) (
 		return nil, errors.New("JWT must contain exactly one signature")
 	}
 	keyID := jws.Signatures[0].Header.KeyID
+	keys, fresh, generation := r.snapshot()
+	return r.verifyWithSnapshot(ctx, jws, keyID, keys, fresh, generation)
+}
 
-	keys, fresh := r.snapshot()
+func (r *boundedRemoteKeySet) verifyWithSnapshot(ctx context.Context, jws *jose.JSONWebSignature, keyID string, keys []jose.JSONWebKey, fresh bool, generation uint64) ([]byte, error) {
+	var err error
 	if !fresh {
-		keys, err = r.refresh(ctx)
+		keys, generation, err = r.refresh(ctx, generation)
 		if err != nil {
 			return nil, fmt.Errorf("refresh JWKS: %w", err)
 		}
@@ -83,7 +88,7 @@ func (r *boundedRemoteKeySet) VerifySignature(ctx context.Context, raw string) (
 		return payload, nil
 	}
 
-	keys, err = r.refresh(ctx)
+	keys, _, err = r.refresh(ctx, generation)
 	if err != nil {
 		return nil, fmt.Errorf("refresh JWKS after signature miss: %w", err)
 	}
@@ -93,34 +98,45 @@ func (r *boundedRemoteKeySet) VerifySignature(ctx context.Context, raw string) (
 	return nil, errors.New("no JWKS key verified the JWT signature")
 }
 
-func (r *boundedRemoteKeySet) snapshot() ([]jose.JSONWebKey, bool) {
+func (r *boundedRemoteKeySet) snapshot() ([]jose.JSONWebKey, bool, uint64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	keys := append([]jose.JSONWebKey(nil), r.keys...)
 	age := r.now().Sub(r.fetchedAt)
 	fresh := len(keys) > 0 && !r.fetchedAt.IsZero() && age < r.maxAge
-	return keys, fresh
+	return keys, fresh, r.generation
 }
 
-func (r *boundedRemoteKeySet) refresh(ctx context.Context) ([]jose.JSONWebKey, error) {
+func (r *boundedRemoteKeySet) refresh(ctx context.Context, observedGeneration uint64) ([]jose.JSONWebKey, uint64, error) {
 	r.mu.Lock()
+	if r.generation != observedGeneration {
+		keys := append([]jose.JSONWebKey(nil), r.keys...)
+		generation := r.generation
+		r.mu.Unlock()
+		return keys, generation, nil
+	}
 	if r.inflight != nil {
 		inflight := r.inflight
 		r.mu.Unlock()
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return nil, observedGeneration, ctx.Err()
 		case <-inflight:
 			r.mu.Lock()
 			defer r.mu.Unlock()
-			return append([]jose.JSONWebKey(nil), r.keys...), r.lastError
+			keys := append([]jose.JSONWebKey(nil), r.keys...)
+			if r.generation != observedGeneration {
+				return keys, r.generation, nil
+			}
+			return keys, r.generation, r.lastError
 		}
 	}
 	now := r.now()
 	if !r.lastAttempt.IsZero() && now.Sub(r.lastAttempt) < r.cooldown {
 		keys := append([]jose.JSONWebKey(nil), r.keys...)
+		generation := r.generation
 		r.mu.Unlock()
-		return keys, errJWKSRefreshCooldown
+		return keys, generation, errJWKSRefreshCooldown
 	}
 	r.lastAttempt = now
 	inflight := make(chan struct{})
@@ -134,13 +150,15 @@ func (r *boundedRemoteKeySet) refresh(ctx context.Context) ([]jose.JSONWebKey, e
 	if err == nil {
 		r.keys = keys
 		r.fetchedAt = fetchedAt
+		r.generation++
 	}
 	r.lastError = err
 	r.inflight = nil
 	close(inflight)
 	result := append([]jose.JSONWebKey(nil), r.keys...)
+	generation := r.generation
 	r.mu.Unlock()
-	return result, err
+	return result, generation, err
 }
 
 func (r *boundedRemoteKeySet) fetch(ctx context.Context) ([]jose.JSONWebKey, error) {

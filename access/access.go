@@ -1,4 +1,4 @@
-// Package access verifies Cloudflare Access identity at the application boundary.
+// Package access verifies Cloudflare Access assertions at the application boundary.
 package access
 
 import (
@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"strings"
+	"regexp"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 )
@@ -16,6 +16,8 @@ const (
 	AssertionHeader  = "Cf-Access-Jwt-Assertion"
 	maxAssertionSize = 16_000
 )
+
+var teamDomainPattern = regexp.MustCompile(`^[a-z0-9-]+\.cloudflareaccess\.com$`)
 
 var (
 	ErrMissingAssertion  = errors.New("Cloudflare Access assertion is missing")
@@ -137,8 +139,7 @@ func (a *Authenticator) Middleware(reject RejectFunc) func(http.Handler) http.Ha
 }
 
 func validTeamDomain(domain string) bool {
-	prefix, ok := strings.CutSuffix(domain, ".cloudflareaccess.com")
-	return ok && prefix != "" && !strings.ContainsAny(prefix, "/:?# \t\r\n")
+	return teamDomainPattern.MatchString(domain)
 }
 
 func loopbackListener(address string) bool {

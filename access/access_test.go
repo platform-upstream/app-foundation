@@ -138,6 +138,95 @@ func TestBoundedJWKSRefreshAndCooldown(t *testing.T) {
 	}
 }
 
+func TestConcurrentRefreshUsesNewGenerationDuringCooldown(t *testing.T) {
+	key1 := generateKey(t)
+	key2 := generateKey(t)
+	type servedKey struct {
+		id  string
+		key *rsa.PublicKey
+	}
+	var current atomic.Pointer[servedKey]
+	current.Store(&servedKey{id: "key-1", key: &key1.PublicKey})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		value := current.Load()
+		writeJWKS(t, w, value.id, value.key)
+	}))
+	defer server.Close()
+
+	clock := time.Date(2026, 10, 4, 12, 0, 0, 0, time.UTC)
+	keys := newBoundedRemoteKeySet(server.URL, server.Client())
+	keys.now = func() time.Time { return clock }
+	token1 := sign(t, key1, "key-1", map[string]any{"sub": "one"})
+	token2 := sign(t, key2, "key-2", map[string]any{"sub": "two"})
+	if _, err := keys.VerifySignature(context.Background(), token1); err != nil {
+		t.Fatalf("prime old key: %v", err)
+	}
+
+	// Request A has already captured the old generation. Hold it at that exact point while
+	// request B refreshes the rotated key and starts the cooldown.
+	oldKeys, fresh, oldGeneration := keys.snapshot()
+	parsed, err := jose.ParseSigned(token2, []jose.SignatureAlgorithm{jose.RS256})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := verifyWithKeys(parsed, "key-2", oldKeys); ok {
+		t.Fatal("old snapshot unexpectedly verifies rotated token")
+	}
+	current.Store(&servedKey{id: "key-2", key: &key2.PublicKey})
+	clock = clock.Add(jwksCooldown + time.Second)
+
+	bFinished := make(chan struct{})
+	bResult := make(chan error, 1)
+	go func() {
+		_, err := keys.VerifySignature(context.Background(), token2)
+		bResult <- err
+		close(bFinished)
+	}()
+
+	aResult := make(chan error, 1)
+	go func() {
+		<-bFinished
+		_, err := keys.verifyWithSnapshot(context.Background(), parsed, "key-2", oldKeys, fresh, oldGeneration)
+		aResult <- err
+	}()
+	if err := <-bResult; err != nil {
+		t.Fatalf("request B refresh: %v", err)
+	}
+	if err := <-aResult; err != nil {
+		t.Fatalf("request A rejected keys from newer generation: %v", err)
+	}
+}
+
+func TestStaleJWKSFailsClosedWhenRefreshFails(t *testing.T) {
+	key := generateKey(t)
+	var fail atomic.Bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if fail.Load() {
+			http.Error(w, "unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		writeJWKS(t, w, "key-1", &key.PublicKey)
+	}))
+	defer server.Close()
+
+	clock := time.Date(2026, 10, 4, 12, 0, 0, 0, time.UTC)
+	keys := newBoundedRemoteKeySet(server.URL, server.Client())
+	keys.now = func() time.Time { return clock }
+	token := sign(t, key, "key-1", map[string]any{"sub": "one"})
+	if _, err := keys.VerifySignature(context.Background(), token); err != nil {
+		t.Fatalf("prime key: %v", err)
+	}
+
+	clock = clock.Add(jwksCacheMaxAge + time.Second)
+	fail.Store(true)
+	if _, err := keys.VerifySignature(context.Background(), token); err == nil {
+		t.Fatal("stale key was accepted after required refresh failed")
+	}
+	if _, err := keys.VerifySignature(context.Background(), token); !errors.Is(err, errJWKSRefreshCooldown) {
+		t.Fatalf("stale key during failed-refresh cooldown error = %v", err)
+	}
+}
+
 func TestJWKSClientHasFiveSecondCeiling(t *testing.T) {
 	if got := newBoundedRemoteKeySet("https://example.invalid", nil).client.Timeout; got != 5*time.Second {
 		t.Fatalf("default timeout = %s", got)
@@ -196,6 +285,22 @@ func TestLocalModeRequiresLoopbackListener(t *testing.T) {
 	for _, address := range []string{":8096", "0.0.0.0:8096", "localhost:8096", "bad", "[::1]:8096"} {
 		if _, err := New(Config{Mode: ModeLocal, Listener: address}); err == nil {
 			t.Errorf("New(local, %q) succeeded", address)
+		}
+	}
+}
+
+func TestTeamDomainIsLowercaseSingleLabel(t *testing.T) {
+	if !validTeamDomain("niiku.cloudflareaccess.com") {
+		t.Fatal("valid team domain rejected")
+	}
+	for _, domain := range []string{
+		"Niiku.cloudflareaccess.com",
+		"niiku.dev.cloudflareaccess.com",
+		"niiku_test.cloudflareaccess.com",
+		"niiku.cloudflareaccess.com.evil.example",
+	} {
+		if validTeamDomain(domain) {
+			t.Errorf("invalid team domain accepted: %q", domain)
 		}
 	}
 }
