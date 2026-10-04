@@ -1,0 +1,34 @@
+replicaCount: 1
+
+image:
+  repository: localhost/foundation-reference
+  tag: "0.0.1"
+  pullPolicy: IfNotPresent
+
+ingress:
+  enabled: false
+  className: traefik
+  hostname: ""
+
+auth:
+  mode: cloudflare
+  origin: ""
+  teamDomain: ""
+  audience: ""
+
+persistence:
+  enabled: true
+  storageClassName: ""
+  size: 1Gi
+
+resources:
+  requests:
+    cpu: 5m
+    memory: 16Mi
+  limits:
+    cpu: 500m
+    memory: 64Mi
+
+runtime:
+  goMemLimit: 48MiB
+  goMaxProcs: "2"

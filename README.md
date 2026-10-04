@@ -27,6 +27,9 @@ The source registry workflow and its deliberate non-abstractions are documented 
 [docs/frontend-registry.md](docs/frontend-registry.md).
 The credential-free delivery starting point and app-owned customization boundaries are documented
 in [docs/app-scaffold.md](docs/app-scaffold.md).
+The local-only [reference application](reference-app/README.md) composes every accepted Phase 1
+primitive and carries the full behavioral, browser, packaging, clean-build, and runtime proof. It
+is deliberately absent from all production workload repositories.
 
 ## Minimal use
 
