@@ -24,6 +24,12 @@ func TestRunRejectsNilServer(t *testing.T) {
 	}
 }
 
+func TestServeRejectsNilListener(t *testing.T) {
+	if err := Serve(context.Background(), New("127.0.0.1:0", http.NotFoundHandler()), nil); err == nil {
+		t.Fatal("Serve accepted nil listener")
+	}
+}
+
 func TestHealth(t *testing.T) {
 	for _, tc := range []struct {
 		name   string

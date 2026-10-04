@@ -6,7 +6,7 @@ leaving application routes, schema, copy, policy, and domain code in each app.
 
 The initial packages are:
 
-- `access`: Cloudflare Access JWT verification, request identity, and loopback-only local mode.
+- `access`: bounded Cloudflare Access JWT verification and loopback-only local mode.
 - `httpx`: request IDs plus strict bounded JSON decoding and the existing `{"error":"..."}` shape.
 - `server`: explicit HTTP server limits, health responses, and graceful context-driven shutdown.
 - `sqlite`: bounded pure-Go SQLite setup and ordered embedded transactional migrations.
@@ -67,8 +67,9 @@ GitHub credentials out of build arguments and image layers. `go mod vendor` reco
 
 The module follows SemVer and remains on `v0.x.y` while the first consumers prove the interfaces.
 Breaking pre-1.0 changes increment the minor version; compatible fixes increment the patch version.
-A release is cut only from reviewed, green `main` after at least one consumer has verified the
-affected interface:
+The initial `v0.1.0` may be cut from reviewed, green `main` once the Read inventory and independent
+foundation review confirm its interface. Later releases require an affected consumer to verify the
+changed interface before tagging:
 
 ```bash
 go test ./...
@@ -79,5 +80,5 @@ git push origin v0.1.0
 gh release create v0.1.0 --verify-tag --generate-notes
 ```
 
-No release tag is created as part of the initial skeleton until the Read inventory and independent
-review confirm the first consumer contract.
+No release tag is created as part of the initial skeleton commit; the coordinator owns the review
+gate and release decision.

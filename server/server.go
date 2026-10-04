@@ -57,6 +57,9 @@ func Serve(ctx context.Context, srv *http.Server, listener net.Listener) error {
 	if srv == nil {
 		return errors.New("server is nil")
 	}
+	if listener == nil {
+		return errors.New("listener is nil")
+	}
 	return run(ctx, srv, func() error { return srv.Serve(listener) })
 }
 
