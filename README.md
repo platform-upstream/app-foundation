@@ -9,14 +9,16 @@ The initial packages are:
 - `access`: bounded Cloudflare Access JWT verification and loopback-only local mode.
 - `httpx`: opt-in request IDs, strict bounded JSON decoding, an explicit JSON API 404, and the
   standard `{"error":"..."}` shape with application-owned copy and status semantics.
+- `memory`: the proven shared Memory service client, including the identical Cook/Watch SQLite
+  cache, durable outbox, and conflict behavior.
 - `server`: explicit HTTP server limits, shallow process health, and graceful context-driven
   shutdown with a bounded deadline.
 - `sqlite`: bounded pure-Go SQLite setup, explicit read-only operation, consistent snapshots, and
   ordered embedded transactional migrations.
 - `web`: embedded SPA/static serving with safe fallback and cache rules.
 
-There is intentionally no app object, router, ORM, repository layer, worker, LLM client, Memory
-client, deployment scaffold, or frontend registry in this first release.
+There is intentionally no app object, router, ORM, repository layer, generic worker, deployment
+runtime, or shared visual system.
 
 ## Minimal use
 
@@ -103,6 +105,18 @@ navigations before its precache route, use the cached shell only for ordinary of
 never fall back for a reauthentication navigation, and never cache `/api/`, `/internal/`, or
 `/cdn-cgi/` responses. Those browser behaviors are installed as source by the frontend registry;
 they are not hidden inside this Go handler.
+
+The `memory` package extracts the byte-identical client generated into Cook and Watch: bounded
+authenticated calls, local cache, durable pending writes, conflict preservation, and lost-response
+reconciliation. The app still owns its Memory scopes, note content, sync schedule, user-facing
+conflict flow, and availability policy. The existing table names are retained so later adoption can
+reuse app data without conversion.
+
+No shared local-LLM client is included. Cook and Watch both call the stable `local-llm` alias, but
+their payloads, deadlines, queueing, caching, structured-output checks, and fallbacks are materially
+different. The reference app uses an injected app-local seam and a fake server; extraction waits
+until two consumers demonstrate identical transport behavior. Prompts and output validation always
+remain app-owned.
 
 ## Private-module consumption
 
