@@ -1,0 +1,27 @@
+version: 1
+toolchain: pnpm
+paths:
+  - .ci/pipeline.yaml
+  - cmd/**
+  - internal/**
+  - migrations/**
+  - web/**
+  - deploy/**
+  - Dockerfile
+  - .dockerignore
+  - go.mod
+  - go.sum
+  - vendor/**
+verify:
+  # The pnpm verifier has no Go toolchain. The credential-free Docker builder runs
+  # Go format-check, vet, and tests against the vendored module graph.
+  install: (cd web && pnpm install --frozen-lockfile)
+  steps:
+    - (cd web && pnpm run typecheck)
+    - (cd web && pnpm run build)
+image:
+  dockerfile: ./Dockerfile
+  context: .
+  name: __APP_NAME__
+chart:
+  path: deploy

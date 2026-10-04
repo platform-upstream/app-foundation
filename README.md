@@ -7,6 +7,7 @@ leaving application routes, schema, copy, policy, and domain code in each app.
 The initial packages are:
 
 - `access`: bounded Cloudflare Access JWT verification and loopback-only local mode.
+- `appscaffold`: a one-time repository-local Docker/CI/Helm scaffold generator.
 - `httpx`: opt-in request IDs, strict bounded JSON decoding, an explicit JSON API 404, and the
   standard `{"error":"..."}` shape with application-owned copy and status semantics.
 - `frontendregistry`: a checked source installer for the React/Vite shell, same-origin JSON client,
@@ -24,6 +25,8 @@ runtime, generated API contract layer, or shared visual system. The bounded Read
 experiment and rejection are recorded in [docs/api-contract-generation.md](docs/api-contract-generation.md).
 The source registry workflow and its deliberate non-abstractions are documented in
 [docs/frontend-registry.md](docs/frontend-registry.md).
+The credential-free delivery starting point and app-owned customization boundaries are documented
+in [docs/app-scaffold.md](docs/app-scaffold.md).
 
 ## Minimal use
 
