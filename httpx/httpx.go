@@ -14,7 +14,10 @@ import (
 	"regexp"
 )
 
-const RequestIDHeader = "X-Request-ID"
+const (
+	RequestIDHeader      = "X-Request-ID"
+	DefaultJSONBodyLimit = int64(32 << 10)
+)
 
 var (
 	ErrInvalidJSON          = errors.New("invalid JSON body")
@@ -49,6 +52,14 @@ func WriteError(w http.ResponseWriter, status int, message string) error {
 	return WriteJSON(w, status, ErrorResponse{Error: message})
 }
 
+// NotFound returns a JSON 404 handler with application-owned copy. Mount it at an API prefix
+// before an embedded SPA fallback so unknown API routes cannot accidentally return HTML.
+func NotFound(message string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = WriteError(w, http.StatusNotFound, message)
+	})
+}
+
 // DecodeJSON strictly decodes one bounded JSON value. Unknown struct fields and trailing values
 // are rejected. StatusCode maps its errors to the corresponding HTTP response status.
 func DecodeJSON(w http.ResponseWriter, r *http.Request, target any, maxBytes int64) error {
@@ -66,6 +77,10 @@ func DecodeJSON(w http.ResponseWriter, r *http.Request, target any, maxBytes int
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {
 			return fmt.Errorf("%w: %v", ErrBodyTooLarge, err)
+		}
+		var invalidTarget *json.InvalidUnmarshalError
+		if errors.As(err, &invalidTarget) {
+			return fmt.Errorf("decode JSON target: %w", err)
 		}
 		return fmt.Errorf("%w: %v", ErrInvalidJSON, err)
 	}
@@ -135,7 +150,8 @@ func directOrigin(r *http.Request) string {
 type requestIDKey struct{}
 
 // RequestIDs accepts a bounded safe upstream request ID or creates one, then exposes it through
-// both response headers and request context.
+// both response headers and request context. Applications opt in to this middleware when adding
+// the response header is compatible with their existing HTTP contract.
 func RequestIDs(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.Header.Get(RequestIDHeader)

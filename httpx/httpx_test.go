@@ -19,10 +19,14 @@ func TestDecodeJSON(t *testing.T) {
 		status                  int
 	}{
 		{"valid", "application/json; charset=utf-8", `{"name":"read"}`, 100, nil, 0},
+		{"valid at exact limit", "application/json", `{}`, 2, nil, 0},
 		{"wrong content type", "text/plain", `{}`, 100, ErrUnsupportedMediaType, 415},
+		{"missing content type", "", `{}`, 100, ErrUnsupportedMediaType, 415},
+		{"empty", "application/json", ``, 100, ErrInvalidJSON, 400},
 		{"unknown field", "application/json", `{"extra":true}`, 100, ErrInvalidJSON, 400},
 		{"trailing value", "application/json", `{"name":"read"}{}`, 100, ErrInvalidJSON, 400},
 		{"too large", "application/json", `{"name":"read"}`, 4, ErrBodyTooLarge, 413},
+		{"trailing whitespace exceeds limit", "application/json", `{} `, 2, ErrBodyTooLarge, 413},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -36,6 +40,18 @@ func TestDecodeJSON(t *testing.T) {
 				t.Fatalf("StatusCode = %d, want %d", StatusCode(err), tc.status)
 			}
 		})
+	}
+}
+
+func TestDecodeJSONProgrammingErrorsAreInternal(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{}`))
+	r.Header.Set("Content-Type", "application/json")
+	err := DecodeJSON(httptest.NewRecorder(), r, nil, DefaultJSONBodyLimit)
+	if err == nil {
+		t.Fatal("DecodeJSON accepted a nil target")
+	}
+	if errors.Is(err, ErrInvalidJSON) || StatusCode(err) != http.StatusInternalServerError {
+		t.Fatalf("DecodeJSON error = %v, status = %d; want internal error", err, StatusCode(err))
 	}
 }
 
@@ -72,6 +88,14 @@ func TestWriteError(t *testing.T) {
 		t.Fatal(err)
 	}
 	if w.Code != http.StatusConflict || w.Header().Get("Content-Type") != "application/json; charset=utf-8" || w.Body.String() != "{\"error\":\"changed\"}\n" {
+		t.Fatalf("response = %d %q %q", w.Code, w.Header().Get("Content-Type"), w.Body.String())
+	}
+}
+
+func TestNotFound(t *testing.T) {
+	w := httptest.NewRecorder()
+	NotFound("Not found.").ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/missing", nil))
+	if w.Code != http.StatusNotFound || w.Header().Get("Content-Type") != "application/json; charset=utf-8" || w.Body.String() != "{\"error\":\"Not found.\"}\n" {
 		t.Fatalf("response = %d %q %q", w.Code, w.Header().Get("Content-Type"), w.Body.String())
 	}
 }

@@ -13,7 +13,7 @@ import (
 
 func TestNewUsesBoundedDefaults(t *testing.T) {
 	srv := New("127.0.0.1:8080", http.NotFoundHandler())
-	if srv.ReadHeaderTimeout != 5*time.Second || srv.ReadTimeout != 20*time.Second || srv.WriteTimeout != 20*time.Second || srv.IdleTimeout != 60*time.Second || srv.MaxHeaderBytes != 32<<10 {
+	if srv.ReadHeaderTimeout != DefaultReadHeaderTimeout || srv.ReadTimeout != DefaultReadTimeout || srv.WriteTimeout != DefaultWriteTimeout || srv.IdleTimeout != DefaultIdleTimeout || srv.MaxHeaderBytes != DefaultMaxHeaderBytes {
 		t.Fatalf("unexpected server defaults: %#v", srv)
 	}
 }
@@ -31,22 +31,15 @@ func TestServeRejectsNilListener(t *testing.T) {
 }
 
 func TestHealth(t *testing.T) {
-	for _, tc := range []struct {
-		name   string
-		check  func(context.Context) error
-		status int
-		body   string
-	}{
-		{"healthy", func(context.Context) error { return nil }, 200, `{"ok":true}` + "\n"},
-		{"unhealthy", func(context.Context) error { return errors.New("private detail") }, 503, `{"ok":false}` + "\n"},
+	for _, handler := range []http.Handler{
+		Health(),
+		Health(func(context.Context) error { return errors.New("legacy dependency failure") }),
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			w := httptest.NewRecorder()
-			Health(tc.check).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/healthz", nil))
-			if w.Code != tc.status || w.Body.String() != tc.body || w.Header().Get("Cache-Control") != "no-store" {
-				t.Fatalf("health = %d %q %#v", w.Code, w.Body.String(), w.Header())
-			}
-		})
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+		if w.Code != http.StatusOK || w.Body.String() != `{"ok":true}`+"\n" || w.Header().Get("Cache-Control") != "no-store" || w.Header().Get("Content-Type") != "application/json; charset=utf-8" {
+			t.Fatalf("health = %d %q %#v", w.Code, w.Body.String(), w.Header())
+		}
 	}
 }
 
@@ -92,5 +85,67 @@ func TestServeGracefullyFinishesActiveRequest(t *testing.T) {
 	}
 	if err := <-done; err != nil {
 		t.Fatalf("Serve: %v", err)
+	}
+}
+
+func TestServeForcesCloseAtShutdownDeadline(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	srv := New(listener.Addr().String(), http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		close(entered)
+		<-release
+	}))
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- ServeWithShutdownTimeout(ctx, srv, listener, 30*time.Millisecond) }()
+
+	response := make(chan error, 1)
+	go func() {
+		resp, err := http.Get("http://" + listener.Addr().String())
+		if err == nil {
+			defer resp.Body.Close()
+			_, err = io.ReadAll(resp.Body)
+		}
+		response <- err
+	}()
+	select {
+	case <-entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("request did not enter handler")
+	}
+	started := time.Now()
+	cancel()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("ServeWithShutdownTimeout error = %v, want deadline exceeded", err)
+		}
+		if elapsed := time.Since(started); elapsed < 20*time.Millisecond || elapsed > 500*time.Millisecond {
+			t.Fatalf("shutdown elapsed = %v, want bounded near configured deadline", elapsed)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("ServeWithShutdownTimeout exceeded bounded deadline")
+	}
+	close(release)
+	select {
+	case <-response:
+	case <-time.After(time.Second):
+		t.Fatal("client did not return after forced close")
+	}
+}
+
+func TestServeRejectsInvalidShutdownTimeout(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	err = ServeWithShutdownTimeout(context.Background(), New(listener.Addr().String(), http.NotFoundHandler()), listener, 0)
+	if err == nil {
+		t.Fatal("ServeWithShutdownTimeout accepted zero timeout")
 	}
 }

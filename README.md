@@ -7,8 +7,10 @@ leaving application routes, schema, copy, policy, and domain code in each app.
 The initial packages are:
 
 - `access`: bounded Cloudflare Access JWT verification and loopback-only local mode.
-- `httpx`: request IDs plus strict bounded JSON decoding and the existing `{"error":"..."}` shape.
-- `server`: explicit HTTP server limits, health responses, and graceful context-driven shutdown.
+- `httpx`: opt-in request IDs, strict bounded JSON decoding, an explicit JSON API 404, and the
+  standard `{"error":"..."}` shape with application-owned copy and status semantics.
+- `server`: explicit HTTP server limits, shallow process health, and graceful context-driven
+  shutdown with a bounded deadline.
 - `sqlite`: bounded pure-Go SQLite setup and ordered embedded transactional migrations.
 - `web`: embedded SPA/static serving with safe fallback and cache rules.
 
@@ -34,20 +36,37 @@ func main() {
 	spa, err := web.Handler(assets)
 	if err != nil { log.Fatal(err) }
 
+	protected := http.NewServeMux()
+	protected.Handle("GET /api/items", itemsHandler(db))
+	protected.Handle("/api/", httpx.NotFound("Not found."))
+	protected.Handle("/", spa)
+
 	mux := http.NewServeMux()
-	mux.Handle("GET /healthz", server.Health(db.PingContext))
-	mux.Handle("/", spa)
+	mux.Handle("GET /healthz", server.Health())
+	mux.Handle("/", protected)
 
 	srv := server.New("127.0.0.1:8080", httpx.RequestIDs(mux))
 	if err := server.Run(ctx, srv); err != nil { log.Fatal(err) }
 }
 ```
 
-Applications construct their own route tree and choose their own authentication failure messages.
-Compose middleware in this order: application security headers; public `/healthz`; separately
-bearer-authenticated internal routes; Cloudflare/local authentication for everything else (including
-static files); and same-origin plus body limits at the API layer. Mount `/api/` and `/internal/`
-handlers before the SPA handler. See package documentation and tests for focused examples.
+Applications construct their own route tree and choose their own status semantics, validation and
+authentication failure messages. Compose middleware in this order: application security headers;
+optional request IDs; public shallow `/healthz`; separately bearer-authenticated internal routes;
+Cloudflare/local authentication for everything else (including static files); and same-origin plus
+bounded JSON decoding at the API layer. Mount an `httpx.NotFound` `/api/` boundary after registered
+API routes and before the SPA handler. The ordinary JSON body default is 32 KiB; upload/import
+limits remain app-owned. Request IDs remain opt-in because adding a response header is observable
+and the verified Read contract does not currently expose one. See package tests for focused
+examples.
+
+The default server limits are 5 seconds for headers, 20 seconds for reads and writes, 60 seconds
+idle, 32 KiB for headers, and 5 seconds for graceful shutdown. Use
+`RunWithShutdownTimeout`/`ServeWithShutdownTimeout` only when a demonstrated application lifecycle
+needs a different positive shutdown deadline. Dependency checks do not belong in the shared health
+handler; applications may expose a separate readiness endpoint when a real consumer requires one.
+The legacy `Health(check)` call shape still compiles for `v0.1.0` consumers, but checks are ignored;
+use an application-owned readiness route if dependency state genuinely needs to affect routing.
 
 ## Private-module consumption
 
