@@ -143,7 +143,12 @@ func (r *boundedRemoteKeySet) refresh(ctx context.Context, observedGeneration ui
 	r.inflight = inflight
 	r.mu.Unlock()
 
-	keys, err := r.fetch(ctx)
+	// The fetch serves every waiting request and seeds the cache for the next
+	// hour, so it must not die with the one request that happened to start it:
+	// a browser that aborts its first call (a navigation, an unmounted view)
+	// would otherwise fail the refresh and lock every caller out for the
+	// cooldown. The client's own timeout still bounds it.
+	keys, err := r.fetch(context.WithoutCancel(ctx))
 	fetchedAt := r.now()
 
 	r.mu.Lock()

@@ -382,3 +382,26 @@ func sign(t *testing.T, key *rsa.PrivateKey, kid string, claims map[string]any) 
 	}
 	return raw
 }
+
+// The first request after a start is the one that fetches the key set. If that
+// request is cancelled (the browser navigated away), the fetch must still
+// complete: failing it would trip the cooldown and reject every caller for 30s.
+func TestCancelledRequestDoesNotPoisonJWKSRefresh(t *testing.T) {
+	key := generateKey(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		writeJWKS(t, w, "key-1", &key.PublicKey)
+	}))
+	defer server.Close()
+
+	keys := newBoundedRemoteKeySet(server.URL, server.Client())
+	token := sign(t, key, "key-1", map[string]any{"sub": "one"})
+
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := keys.VerifySignature(cancelled, token); err != nil {
+		t.Fatalf("verify with a cancelled request context: %v", err)
+	}
+	if _, err := keys.VerifySignature(context.Background(), token); err != nil {
+		t.Fatalf("verify after a cancelled first request: %v", err)
+	}
+}
