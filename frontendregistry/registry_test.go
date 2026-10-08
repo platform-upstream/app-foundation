@@ -84,7 +84,7 @@ func TestTemplateIncludesRequiredPWAModule(t *testing.T) {
 		"index.html":                                `href="/manifest.webmanifest"`,
 		"public/manifest.webmanifest":               `"start_url": "/"`,
 		"src/foundation/api.ts":                     "new URL('/api/', location.origin)",
-		"src/foundation/register-service-worker.ts": "new URL('/sw.js', origin)",
+		"src/foundation/register-service-worker.ts": "new URL(options.base ?? '/', origin)",
 	} {
 		contents, err := os.ReadFile(filepath.Join(target, filepath.FromSlash(name)))
 		if err != nil {

@@ -37,7 +37,10 @@ are a starting point, not a shared theme.
   exact auth-expiry predicate/action and user-facing fallback copy injectable.
 - `pwa` installs the update lifecycle proven by Read and a network-first service worker. It never
   handles or caches `/api/`, `/internal/`, or `/cdn-cgi/`; it does not cache redirects; and ordinary
-  offline navigations may fall back to the cached shell. Cache names are isolated by service-worker
+  offline navigations may fall back to the cached shell. A page that stays open, such as an installed
+  app that is resumed rather than relaunched, checks for a newer build on load and whenever it
+  becomes visible, and reloads into it. `onUpdate(apply)` hands that decision to the application:
+  ask the user, or wait until nothing would be interrupted (Listen never reloads during playback). Cache names are isolated by service-worker
   scope. Push, share-target, notification, and background-sync behavior remains app-owned.
 - `template` supplies only a clean React/Vite entry point, visible application-owned QueryClient
   policy, accessible document defaults, root-origin build configuration, PWA registration, and a
