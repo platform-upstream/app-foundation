@@ -11,7 +11,7 @@ cannot redirect output outside the requested target.
 go run github.com/niiku-platform/app-foundation/cmd/app-scaffold@v0.8.0 \
   -target . \
   -name example-app \
-  -image zot.local:5000/niiku-platform/example-app
+  -image zot.int.niiku.xyz/niiku-platform/example-app
 ```
 
 The name must be a DNS label. The image argument is a repository without a tag. Generate into a

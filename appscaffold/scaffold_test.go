@@ -9,7 +9,7 @@ import (
 
 func TestGenerate(t *testing.T) {
 	target := t.TempDir()
-	options := Options{Name: "reference-app", ImageRepository: "zot.local:5000/niiku-platform/reference-app"}
+	options := Options{Name: "reference-app", ImageRepository: "zot.int.niiku.xyz/niiku-platform/reference-app"}
 	if err := Generate(target, options); err != nil {
 		t.Fatal(err)
 	}
@@ -27,7 +27,7 @@ func TestGenerate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(values), "repository: zot.local:5000/niiku-platform/reference-app") {
+	if !strings.Contains(string(values), "repository: zot.int.niiku.xyz/niiku-platform/reference-app") {
 		t.Fatalf("image repository not rendered:\n%s", values)
 	}
 }
