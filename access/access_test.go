@@ -81,6 +81,50 @@ func TestCloudflareGate(t *testing.T) {
 	}
 }
 
+func TestServiceTokenAcceptedOnlyWhenListed(t *testing.T) {
+	key := generateKey(t)
+	const (
+		kid    = "test-key"
+		issuer = "https://test.cloudflareaccess.com"
+		aud    = "test-audience"
+	)
+	jwks := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		writeJWKS(t, w, kid, &key.PublicKey)
+	}))
+	defer jwks.Close()
+	serviceToken := func(commonName string) string {
+		return sign(t, key, kid, map[string]any{
+			"iss": issuer, "aud": aud, "sub": "", "common_name": commonName,
+			"iat": time.Now().Unix(), "exp": time.Now().Add(5 * time.Minute).Unix(),
+		})
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/items", nil)
+
+	auth := newCloudflare(issuer, jwks.URL, aud, jwks.Client())
+	auth.serviceTokens = map[string]struct{}{"listed.access": {}}
+	req.Header.Set(AssertionHeader, serviceToken("listed.access"))
+	if err := auth.Authenticate(req); err != nil {
+		t.Fatalf("listed service token: %v", err)
+	}
+	for _, commonName := range []string{"other.access", ""} {
+		req.Header.Set(AssertionHeader, serviceToken(commonName))
+		if err := auth.Authenticate(req); !errors.Is(err, ErrInvalidAssertion) {
+			t.Fatalf("common_name %q error = %v", commonName, err)
+		}
+	}
+
+	if _, err := New(Config{TeamDomain: "test.cloudflareaccess.com", Audience: aud, ServiceTokenClientIDs: []string{" x"}}); err == nil {
+		t.Fatal("whitespace client ID was accepted")
+	}
+	configured, err := New(Config{TeamDomain: "test.cloudflareaccess.com", Audience: aud, ServiceTokenClientIDs: []string{"listed.access"}})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if _, ok := configured.serviceTokens["listed.access"]; !ok || len(configured.serviceTokens) != 1 {
+		t.Fatalf("configured service tokens = %v", configured.serviceTokens)
+	}
+}
+
 func TestBoundedJWKSRefreshAndCooldown(t *testing.T) {
 	key1 := generateKey(t)
 	key2 := generateKey(t)
