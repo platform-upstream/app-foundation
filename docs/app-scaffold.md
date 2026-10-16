@@ -53,8 +53,8 @@ router, app-of-apps wrapper, or any production workload.
   deadlocks.
 - The initial profile is 5m CPU / 16 MiB memory requested, 500m / 64 MiB limited, and
   `GOMEMLIMIT=48MiB`. These are starting values that an app replaces with measured values.
-- The pod binds through `APP_ADDR=$(POD_IP):8080`, which works on host01 with IPv6 disabled. The
-  application must read this explicit address.
+- The pod listens on all its interfaces (`APP_ADDR=:8080`); the namespace's NetworkPolicies decide
+  who may connect.
 - Service-account tokens and service links are disabled. Pod/container security contexts require
   non-root UID/GID 65532, RuntimeDefault seccomp, no capabilities or privilege escalation, and a
   read-only root filesystem.
@@ -74,7 +74,7 @@ frontend registry, and pinned to private `app-foundation v0.7.0` before vendorin
 - distroless container execution as `65532:65532` with `--read-only`, writable tmpfs mounts, healthy
   `/healthz`, and an embedded shell;
 - `helm lint`, disabled-ingress render, enabled-ingress render, and assertions for the chart-owned
-  image, probes, PVC, resource defaults, pod-IP binding, and security contexts; and
+  image, probes, PVC, resource defaults, listen address, and security contexts; and
 - a source/image-history credential-pattern scan.
 
 No image was pushed and no chart was installed.

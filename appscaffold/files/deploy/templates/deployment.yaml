@@ -31,13 +31,8 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
-            - name: POD_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
-            # host01 has IPv6 disabled; bind the pod IP rather than an unspecified dual-stack address.
             - name: APP_ADDR
-              value: "$(POD_IP):8080"
+              value: ":8080"
             - name: GOMEMLIMIT
               value: {{ .Values.runtime.goMemLimit | quote }}
             - name: GOMAXPROCS
