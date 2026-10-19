@@ -18,6 +18,10 @@ The name must be a DNS label. The image argument is a repository without a tag. 
 repository that already follows the standard `cmd/`, `internal/`, `migrations/`, and `web/` layout;
 then review every generated file before committing it.
 
+The Dockerfile checks the registry-owned frontend files (`pwa`, `pwa-shell`); add the tool to
+`go.mod` first (`go get -tool github.com/niiku-platform/app-foundation/cmd/frontend-registry`,
+then `go mod vendor`).
+
 The generated `AGENTS.md` is a stub: fill in the first paragraph and the app-specific look, keep
 the pointers to the shared UI rules, the architecture specification and the `review` skill.
 

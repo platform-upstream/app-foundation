@@ -7,15 +7,21 @@
     "pwa": {
       "description": "Network-first service worker and update registration that exclude API, internal, and Cloudflare Access paths."
     },
+    "pwa-shell": {
+      "description": "iOS-standalone-safe mobile shell: large-viewport height, keyboard handling, nav as the last flex child, published nav height."
+    },
     "template": {
-      "description": "Minimal React/Vite application shell with app-owned content, theme, query policy, and layout.",
-      "requires": ["pwa"]
+      "description": "Minimal React/Vite application with app-owned content, theme, query policy, top bar and nav on the shared shell.",
+      "requires": ["pwa", "pwa-shell"]
     }
   },
   "files": [
     { "module": "api", "source": "sources/api/api.ts", "target": "src/foundation/api.ts" },
     { "module": "pwa", "source": "sources/pwa/register-service-worker.ts", "target": "src/foundation/register-service-worker.ts" },
     { "module": "pwa", "source": "sources/pwa/sw.js", "target": "public/sw.js" },
+    { "module": "pwa-shell", "source": "sources/pwa-shell/shell.css", "target": "src/foundation/shell.css" },
+    { "module": "pwa-shell", "source": "sources/pwa-shell/viewport.ts", "target": "src/foundation/viewport.ts" },
+    { "module": "pwa-shell", "source": "sources/pwa-shell/AppShell.tsx", "target": "src/foundation/AppShell.tsx" },
     { "module": "template", "source": "sources/template/package.json", "target": "package.json" },
     { "module": "template", "source": "sources/template/pnpm-lock.yaml", "target": "pnpm-lock.yaml" },
     { "module": "template", "source": "sources/template/tsconfig.json", "target": "tsconfig.json" },

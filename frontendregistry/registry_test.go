@@ -3,6 +3,7 @@ package frontendregistry
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -71,7 +72,7 @@ func TestTemplateIncludesRequiredPWAModule(t *testing.T) {
 	if err := registry.Install(target, "template"); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"package.json", "public/sw.js", "src/foundation/register-service-worker.ts"} {
+	for _, name := range []string{"package.json", "public/sw.js", "src/foundation/register-service-worker.ts", "src/foundation/shell.css", "src/foundation/AppShell.tsx", "src/foundation/viewport.ts"} {
 		if _, err := os.Stat(filepath.Join(target, filepath.FromSlash(name))); err != nil {
 			t.Fatalf("required template file %q: %v", name, err)
 		}
@@ -149,5 +150,38 @@ func TestManifestPathValidation(t *testing.T) {
 	}
 	if err := validateManifest(value); err == nil {
 		t.Fatal("unsafe target accepted")
+	}
+}
+
+// Port of Omni's guard: the shell stays on the large viewport in normal flow, and the keyboard rule
+// never sets a property that turns the shell into a containing block for fixed overlays.
+func TestShellKeepsLargeViewportAndNoContainingBlock(t *testing.T) {
+	raw, err := content.ReadFile("sources/pwa-shell/shell.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	css := string(raw)
+	if !strings.Contains(css, "@layer foundation {") {
+		t.Fatal("shell.css must stay in @layer foundation so app utilities win")
+	}
+	rule := func(selector string) string {
+		match := regexp.MustCompile(`(?m)^\s*` + regexp.QuoteMeta(selector) + `\s*\{([^}]*)\}`).FindStringSubmatch(css)
+		if match == nil {
+			t.Fatalf("rule %q missing", selector)
+		}
+		return match[1]
+	}
+	shell := rule(".app-shell")
+	if !strings.Contains(shell, "height: 100lvh") {
+		t.Fatalf(".app-shell lost 100lvh:%s", shell)
+	}
+	if regexp.MustCompile(`(^|[;{\s])position\s*:`).MatchString(shell) {
+		t.Fatalf(".app-shell must stay in normal flow at rest:%s", shell)
+	}
+	keyboard := rule(".keyboard-open .app-shell")
+	for _, property := range []string{"transform", "filter", "perspective", "will-change", "contain"} {
+		if regexp.MustCompile(`(^|[;{\s])` + property + `\s*:`).MatchString(keyboard) {
+			t.Fatalf("keyboard rule sets %s (containing-block trap)", property)
+		}
 	}
 }

@@ -7,16 +7,39 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; font-size: 17px; }
+body { min-width: 320px; font-size: 17px; }
 button, input, textarea, select { font: inherit; }
 :focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
 
-main {
-  width: min(44rem, calc(100% - 2rem));
-  margin: 0 auto;
-  padding: clamp(3rem, 10vw, 8rem) 0;
+/* Top bar: carries the page title and pads the status bar (black-translucent). */
+.topbar {
+  padding: max(0.75rem, env(safe-area-inset-top)) 1rem 0.75rem;
+  background: #ffffff;
+  border-bottom: 1px solid #e3e6ee;
+}
+.topbar h1 { margin: 0; font-size: 1.5rem; }
+
+/* Bottom nav: paints its own background and safe-area padding; hidden where a sidebar would take
+   over on desktop. */
+.bottom-nav {
+  display: flex;
+  justify-content: space-around;
+  padding: 0.75rem 1rem max(env(safe-area-inset-bottom), 0.5rem);
+  background: #ffffff;
+  border-top: 1px solid #e3e6ee;
+}
+.bottom-nav a { color: inherit; font-weight: 600; text-decoration: none; }
+/* From 768px a sidebar (AppShell `sidebar`) takes over navigation; add one before hiding the nav
+   for good. `.app-layout` is the desktop row next to that sidebar. */
+@media (min-width: 768px) {
+  .app-layout { flex-direction: row; }
+  .bottom-nav { display: none; }
 }
 
-h1 { max-width: 18ch; font-size: clamp(2.25rem, 7vw, 4.75rem); line-height: 1.03; }
+.page {
+  width: min(44rem, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 2rem 0;
+}
 p { max-width: 62ch; line-height: 1.65; }
 .eyebrow { font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }

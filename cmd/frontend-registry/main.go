@@ -63,7 +63,7 @@ func run(arguments []string) error {
 		for _, difference := range differences {
 			_, _ = fmt.Fprintf(os.Stderr, "%s: %s\n", difference.Target, difference.Reason)
 		}
-		return fmt.Errorf("frontend registry check found %d difference(s)", len(differences))
+		return fmt.Errorf("frontend registry check found %d difference(s); registry-owned files are not edited in the app: run `frontend-registry sync -target %s -modules %s` and review the diff", len(differences), *target, *moduleList)
 	}
 }
 

@@ -10,7 +10,7 @@ The initial packages are:
 - `appscaffold`: a one-time repository-local Docker/CI/Helm scaffold generator.
 - `httpx`: opt-in request IDs, strict bounded JSON decoding, an explicit JSON API 404, and the
   standard `{"error":"..."}` shape with application-owned copy and status semantics.
-- `frontendregistry`: a checked source installer for the React/Vite shell, same-origin JSON client,
+- `frontendregistry`: a checked source installer for the React/Vite template, the iOS-safe mobile shell (`pwa-shell`), same-origin JSON client,
   and PWA lifecycle; it shares no theme or layout.
 - `memory`: the proven shared Memory service client, including the identical Cook/Watch SQLite
   cache, durable outbox, and conflict behavior.

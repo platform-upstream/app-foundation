@@ -20,6 +20,7 @@ COPY internal/ ./internal/
 COPY migrations/ ./migrations/
 COPY web/ ./web/
 COPY --from=frontend /src/web/dist ./web/dist
+RUN go tool frontend-registry check -target web -modules pwa,pwa-shell
 ARG CACHE_SCOPE=local
 RUN --mount=type=cache,id=gobuild-${CACHE_SCOPE},target=/root/.cache/go-build \
     test -z "$(gofmt -l cmd internal)" && \

@@ -1,0 +1,70 @@
+/* Shared PWA shell mechanics (app-foundation registry module `pwa-shell`). Registry-owned: do not
+   edit in an application; `frontend-registry check` fails on any change. Look, top bar, nav items,
+   nav background and safe-area padding stay application-owned.
+
+   Everything sits in the `foundation` layer. Import this file before the application's own CSS,
+   so Tailwind utilities (`md:flex-row`, `md:hidden`) and unlayered application rules still win. */
+@layer foundation {
+  /* min-height, not height:100% + overflow:hidden: a locked document makes iOS standalone resolve
+     the bottom against the small viewport. Overscroll stays off: no rubber-banding of the shell. */
+  html {
+    min-height: 100%;
+    overscroll-behavior-y: none;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100%;
+  }
+
+  /* Lock the document only while the soft keyboard is open, so iOS cannot scroll the whole page
+     up behind it. */
+  html.keyboard-open,
+  html.keyboard-open body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  /* The shell fills the physical screen. In an iOS standalone PWA only the large viewport unit
+     reaches the real bottom edge (measured: lvh 844, dvh and svh 797). position:fixed would force
+     the 797 mode and clip the nav, so the shell stays in normal flow. */
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100lvh;
+    overflow: hidden;
+  }
+
+  .app-shell-column {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .app-shell-main {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* The nav is the last flex child: it sits on the bottom edge without a clearance offset. Its
+     background and env(safe-area-inset-bottom) padding belong to the application's nav element. */
+  .app-shell-nav {
+    flex-shrink: 0;
+  }
+
+  /* While the keyboard is open the shell follows the visual viewport. position:relative + top,
+     never transform, filter, perspective, will-change or contain: those make the shell a
+     containing block for fixed overlays inside it. */
+  .keyboard-open .app-shell {
+    height: var(--app-height, 100dvh);
+    position: relative;
+    top: var(--vv-offset-top, 0px);
+  }
+}
