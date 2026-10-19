@@ -157,9 +157,10 @@ func TestManifestPathValidation(t *testing.T) {
 	}
 }
 
-// Port of Omni's guard: the shell stays on the large viewport in normal flow, and the keyboard rule
+// Port of Omni's guard: the shell stays in normal flow, on the large viewport under a translucent
+// status bar (dvh otherwise), and the keyboard rule
 // never sets a property that turns the shell into a containing block for fixed overlays.
-func TestShellKeepsLargeViewportAndNoContainingBlock(t *testing.T) {
+func TestShellViewportByStatusBarAndNoContainingBlock(t *testing.T) {
 	raw, err := content.ReadFile("sources/pwa-shell/shell.css")
 	if err != nil {
 		t.Fatal(err)
@@ -176,8 +177,12 @@ func TestShellKeepsLargeViewportAndNoContainingBlock(t *testing.T) {
 		return match[1]
 	}
 	shell := rule(".app-shell")
-	if !strings.Contains(shell, "height: 100lvh") {
-		t.Fatalf(".app-shell lost 100lvh:%s", shell)
+	if !strings.Contains(shell, "height: 100dvh") {
+		t.Fatalf(".app-shell lost 100dvh (exact with the default status bar):%s", shell)
+	}
+	translucent := rule(`:where(html:has(meta[name='apple-mobile-web-app-status-bar-style'][content='black-translucent'])) .app-shell`)
+	if !strings.Contains(translucent, "height: 100lvh") {
+		t.Fatalf("black-translucent shell lost 100lvh:%s", translucent)
 	}
 	if regexp.MustCompile(`(^|[;{\s])position\s*:`).MatchString(shell) {
 		t.Fatalf(".app-shell must stay in normal flow at rest:%s", shell)

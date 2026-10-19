@@ -52,17 +52,18 @@ are a starting point, not a shared theme.
   ask the user, or wait until nothing would be interrupted (Listen never reloads during playback). Cache names are isolated by service-worker
   scope. Push, share-target, notification, and background-sync behavior remains app-owned.
 - `pwa-shell` is the mobile shell proven by Omni in iOS standalone PWAs: `shell.css` (in
-  `@layer foundation`; import it before the app's CSS) keeps the shell at `100lvh` in normal flow
-  and follows the visual viewport while the keyboard is open; `viewport.ts` (`useVisualViewport`)
+  `@layer foundation`; import it before the app's CSS) keeps the shell in normal flow at `100dvh`,
+  or `100lvh` when `index.html` sets the `black-translucent` status bar (only then does the web
+  view cover the status bar; with the default bar `lvh` pushes the nav off the screen), and follows the visual viewport while the keyboard is open; `viewport.ts` (`useVisualViewport`)
   mirrors `visualViewport` into `--app-height`/`--vv-offset-top` and toggles `keyboard-open`;
   `AppShell.tsx` renders shell > sidebar + column (top bar, scrolling `<main>`, nav as the last
   flex child), drops the nav while the keyboard is open and publishes `--shell-nav-height`.
   The application owns the top bar (it pads `env(safe-area-inset-top)`), the nav (its background
-  and `env(safe-area-inset-bottom)` padding, never `position: fixed`, hidden where a sidebar takes
+  and bottom padding `var(--shell-safe-bottom)`, the trimmed home-indicator inset, never `position: fixed`, hidden where a sidebar takes
   over), the desktop layout via `className`, and overlays outside `<AppShell>`. Do not override
   `.app-shell` height or position; floating elements use `--shell-nav-height`, not a hard-coded
   clearance. Only a real iPhone confirms the shell; desktop Chromium cannot reproduce the
-  `lvh`/`dvh` gap.
+  status bar and `lvh`/`dvh` behaviour.
 - `template` supplies only a clean React/Vite entry point, visible application-owned QueryClient
   policy, accessible document defaults, root-origin build configuration, PWA registration, and a
   minimal `AppShell` with a top bar and nav that tells adopters to create an application identity.
