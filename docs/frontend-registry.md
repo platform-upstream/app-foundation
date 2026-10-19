@@ -42,7 +42,9 @@ are a starting point, not a shared theme.
   resolves the default API base from the origin rather than the current SPA route, exposes status
   through `APIError`, uses manual redirects so Cloudflare Access expiry is visible, and leaves the
   exact auth-expiry predicate/action and user-facing fallback copy injectable.
-- `pwa` installs the update lifecycle proven by Read and a network-first service worker. It never
+- `pwa` installs the update lifecycle proven by Read. `template` installs a starting network-first
+  service worker (`public/sw.js`) that the application owns from then on (every app adapts it:
+  asset allowlists, push, cache names), so `check` does not cover it. The starting worker never
   handles or caches `/api/`, `/internal/`, or `/cdn-cgi/`; it does not cache redirects; and ordinary
   offline navigations may fall back to the cached shell. A page that stays open, such as an installed
   app that is resumed rather than relaunched, checks for a newer build on load and whenever it

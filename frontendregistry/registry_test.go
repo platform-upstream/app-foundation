@@ -52,8 +52,12 @@ func TestSelectedModuleAndUnknownModule(t *testing.T) {
 	if err := registry.Install(target, "pwa"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(target, "public", "sw.js")); err != nil {
+	if _, err := os.Stat(filepath.Join(target, "src", "foundation", "register-service-worker.ts")); err != nil {
 		t.Fatal(err)
+	}
+	// The service worker is a template starting point the application owns, not part of pwa.
+	if _, err := os.Stat(filepath.Join(target, "public", "sw.js")); !os.IsNotExist(err) {
+		t.Fatalf("sw.js unexpectedly installed by pwa: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(target, "package.json")); !os.IsNotExist(err) {
 		t.Fatalf("template unexpectedly installed: %v", err)
