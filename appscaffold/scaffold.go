@@ -21,6 +21,7 @@ var applicationName = regexp.MustCompile(`^[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
 
 var templateFiles = []string{
 	".ci/pipeline.yaml",
+	"AGENTS.md",
 	".dockerignore",
 	"Dockerfile",
 	"deploy/Chart.yaml",

@@ -18,6 +18,9 @@ The name must be a DNS label. The image argument is a repository without a tag. 
 repository that already follows the standard `cmd/`, `internal/`, `migrations/`, and `web/` layout;
 then review every generated file before committing it.
 
+The generated `AGENTS.md` is a stub: fill in the first paragraph and the app-specific look, keep
+the pointers to the shared UI rules, the architecture specification and the `review` skill.
+
 ## Docker and private modules
 
 The Dockerfile builds the frozen pnpm frontend first, then copies it into the Go embed directory.
