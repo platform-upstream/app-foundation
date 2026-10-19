@@ -4,7 +4,9 @@ FROM node:24-alpine AS frontend
 RUN corepack enable && corepack prepare pnpm@10.0.0 --activate
 WORKDIR /src/web
 COPY web/package.json web/pnpm-lock.yaml ./
-RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+# CI passes CACHE_SCOPE (deliver or verify): pull-request builds never write the deliveries' caches.
+ARG CACHE_SCOPE=local
+RUN --mount=type=cache,id=pnpm-${CACHE_SCOPE},target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 COPY web/ ./
 RUN pnpm run typecheck && pnpm run build
@@ -18,10 +20,13 @@ COPY internal/ ./internal/
 COPY migrations/ ./migrations/
 COPY web/ ./web/
 COPY --from=frontend /src/web/dist ./web/dist
-RUN test -z "$(gofmt -l cmd internal)" && \
+ARG CACHE_SCOPE=local
+RUN --mount=type=cache,id=gobuild-${CACHE_SCOPE},target=/root/.cache/go-build \
+    test -z "$(gofmt -l cmd internal)" && \
     go vet -mod=vendor ./... && \
     CGO_ENABLED=0 go test -mod=vendor ./...
-RUN CGO_ENABLED=0 GOOS=linux go build -mod=vendor -p 2 -trimpath \
+RUN --mount=type=cache,id=gobuild-${CACHE_SCOPE},target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build -mod=vendor -p 2 -trimpath \
     -ldflags='-s -w' -o /out/app ./cmd/...
 
 FROM gcr.io/distroless/static-debian12:nonroot
