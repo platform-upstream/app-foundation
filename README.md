@@ -12,6 +12,7 @@ The initial packages are:
   standard `{"error":"..."}` shape with application-owned copy and status semantics.
 - `frontendregistry`: a checked source installer for the React/Vite template, the iOS-safe mobile shell (`pwa-shell`), same-origin JSON client,
   and PWA lifecycle; it shares no theme or layout.
+- `llm`: the portable LLM gateway client (completion and JSON-schema output) and its `llmtest` fake.
 - `memory`: the proven shared Memory service client, including the identical Cook/Watch SQLite
   cache, durable outbox, and conflict behavior.
 - `server`: explicit HTTP server limits, shallow process health, and graceful context-driven
@@ -123,11 +124,19 @@ reconciliation. The app still owns its Memory scopes, note content, sync schedul
 conflict flow, and availability policy. The existing table names are retained so later adoption can
 reuse app data without conversion.
 
-No shared local-LLM client is included. Cook and Watch both call the stable `local-llm` alias, but
-their payloads, deadlines, queueing, caching, structured-output checks, and fallbacks are materially
-different. The reference app uses an injected app-local seam and a fake server; extraction waits
-until two consumers demonstrate identical transport behavior. Prompts and output validation always
-remain app-owned.
+`llm` calls the LLM gateway's chat completions API with one portable request shape, so an app
+works whichever model the gateway serves under its alias (the local Gufo model or Claude). Every
+request names the app's alias (no `local-llm` fallback: a key without an alias fails in `New`),
+an explicit `MaxTokens` ceiling for thinking and answer together, and a reasoning `Effort`
+(`none` when unset, because backends differ in what an omitted effort means). Structured output is
+a strict JSON schema through `CompleteJSON`; `Temperature` is a best-effort hint that Claude drops.
+It never sends a backend's own switches (`chat_template_kwargs`, `thinking_budget_tokens`, `top_k`,
+`repeat_penalty`, `json_object`). A client without an API key is disabled and returns
+`ErrDisabled`, so an app keeps running without inference. Deadlines come from the caller's context;
+there are no retries, and bodies are never logged. `llm/llmtest` is a recording fake gateway for
+tests. Prompts, schemas, ceilings, concurrency, caches and validation remain app-owned, and each app
+keeps its own small interface in front of the client. Design and rollout:
+`docs/llm/shared-llm-client-proposal.md` in the workspace repository.
 
 ## Private-module consumption
 
