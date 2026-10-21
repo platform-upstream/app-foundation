@@ -119,11 +119,41 @@ func (e Effort) wire() (string, error) {
 	return "", fmt.Errorf("llm: unknown effort %q", string(e))
 }
 
-// Message is one chat message: Content, or Parts for text mixed with images.
+// Message is one chat message: Content, or Parts for text mixed with images. An assistant
+// message that called tools carries ToolCalls; the tool's answer is a "tool" message with
+// ToolCallID.
 type Message struct {
-	Role    string
-	Content string
-	Parts   []Part
+	Role       string
+	Content    string
+	Parts      []Part
+	ToolCalls  []ToolCall
+	ToolCallID string
+}
+
+// Tool is a function the model may call. Parameters is its JSON schema.
+type Tool struct {
+	Name        string
+	Description string
+	Parameters  json.RawMessage
+}
+
+// ToolCall is one call the model made; Arguments is the JSON text the model wrote.
+type ToolCall struct {
+	ID        string
+	Name      string
+	Arguments string
+}
+
+func (t Tool) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{"type": "function", "function": map[string]any{
+		"name": t.Name, "description": t.Description, "parameters": t.Parameters,
+	}})
+}
+
+func (c ToolCall) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{"id": c.ID, "type": "function", "function": map[string]string{
+		"name": c.Name, "arguments": c.Arguments,
+	}})
 }
 
 // Part is a piece of a multi-part message.
@@ -138,11 +168,15 @@ func Text(text string) Part { return Part{kind: "text", text: text} }
 func Image(url string) Part { return Part{kind: "image_url", url: url} }
 
 func (m Message) MarshalJSON() ([]byte, error) {
+	out := map[string]any{"role": m.Role, "content": m.Content}
+	if len(m.ToolCalls) > 0 {
+		out["tool_calls"] = m.ToolCalls
+	}
+	if m.ToolCallID != "" {
+		out["tool_call_id"] = m.ToolCallID
+	}
 	if len(m.Parts) == 0 {
-		return json.Marshal(struct {
-			Role    string `json:"role"`
-			Content string `json:"content"`
-		}{m.Role, m.Content})
+		return json.Marshal(out)
 	}
 	parts := make([]map[string]any, 0, len(m.Parts))
 	for _, p := range m.Parts {
@@ -155,7 +189,8 @@ func (m Message) MarshalJSON() ([]byte, error) {
 			return nil, errors.New("llm: empty message part")
 		}
 	}
-	return json.Marshal(map[string]any{"role": m.Role, "content": parts})
+	out["content"] = parts
+	return json.Marshal(out)
 }
 
 // Request is one completion.
@@ -167,6 +202,8 @@ type Request struct {
 	// Temperature is a best-effort hint: the local runtime honours it, Claude drops it. A prompt
 	// must work without it.
 	Temperature *float64
+	// Tools are offered with tool_choice "auto".
+	Tools []Tool
 
 	format any
 }
@@ -184,6 +221,7 @@ type Response struct {
 	Content string
 	// Reasoning is the thinking text when the backend returned it.
 	Reasoning    string
+	ToolCalls    []ToolCall
 	FinishReason string
 	Usage        Usage
 	// Timings is the local runtime's speed report; nil from backends that send none.
@@ -192,16 +230,30 @@ type Response struct {
 
 // Complete sends a request and waits for the whole reply. The deadline is ctx's.
 func (c *Client) Complete(ctx context.Context, req Request) (Response, error) {
-	if !c.Enabled() {
-		return Response{}, ErrDisabled
-	}
-	body, err := c.body(req)
+	httpResp, err := c.send(ctx, req, false)
 	if err != nil {
 		return Response{}, err
+	}
+	defer httpResp.Body.Close()
+	data, err := c.readAll(httpResp.Body)
+	if err != nil {
+		return Response{}, err
+	}
+	return decode(data)
+}
+
+// send posts the request and returns a 2xx response; any other status becomes an *Error.
+func (c *Client) send(ctx context.Context, req Request, stream bool) (*http.Response, error) {
+	if !c.Enabled() {
+		return nil, ErrDisabled
+	}
+	body, err := c.body(req, stream)
+	if err != nil {
+		return nil, err
 	}
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint, bytes.NewReader(body))
 	if err != nil {
-		return Response{}, err
+		return nil, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+c.cfg.APIKey)
@@ -210,24 +262,29 @@ func (c *Client) Complete(ctx context.Context, req Request) (Response, error) {
 	}
 	httpResp, err := c.http.Do(httpReq)
 	if err != nil {
-		return Response{}, fmt.Errorf("llm: %w", err)
-	}
-	defer httpResp.Body.Close()
-	limit := c.cfg.MaxResponseBytes
-	data, err := io.ReadAll(io.LimitReader(httpResp.Body, limit+1))
-	if err != nil {
-		return Response{}, fmt.Errorf("llm: %w", err)
-	}
-	if int64(len(data)) > limit {
-		return Response{}, errors.New("llm: reply is too large")
+		return nil, fmt.Errorf("llm: %w", err)
 	}
 	if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
-		return Response{}, &Error{Status: httpResp.StatusCode, Message: errorMessage(data)}
+		defer httpResp.Body.Close()
+		data, _ := io.ReadAll(io.LimitReader(httpResp.Body, 64<<10))
+		return nil, &Error{Status: httpResp.StatusCode, Message: errorMessage(data)}
 	}
-	return decode(data)
+	return httpResp, nil
 }
 
-func (c *Client) body(req Request) ([]byte, error) {
+func (c *Client) readAll(body io.Reader) ([]byte, error) {
+	limit := c.cfg.MaxResponseBytes
+	data, err := io.ReadAll(io.LimitReader(body, limit+1))
+	if err != nil {
+		return nil, fmt.Errorf("llm: %w", err)
+	}
+	if int64(len(data)) > limit {
+		return nil, errors.New("llm: reply is too large")
+	}
+	return data, nil
+}
+
+func (c *Client) body(req Request, stream bool) ([]byte, error) {
 	if len(req.Messages) == 0 {
 		return nil, errors.New("llm: a request needs messages")
 	}
@@ -249,6 +306,14 @@ func (c *Client) body(req Request) ([]byte, error) {
 	}
 	if req.format != nil {
 		body["response_format"] = req.format
+	}
+	if len(req.Tools) > 0 {
+		body["tools"] = req.Tools
+		body["tool_choice"] = "auto"
+	}
+	if stream {
+		body["stream"] = true
+		body["stream_options"] = map[string]bool{"include_usage": true}
 	}
 	return json.Marshal(body)
 }
@@ -281,6 +346,7 @@ func decode(data []byte) (Response, error) {
 				Content          json.RawMessage `json:"content"`
 				ReasoningContent string          `json:"reasoning_content"`
 				Reasoning        string          `json:"reasoning"`
+				ToolCalls        []wireToolCall  `json:"tool_calls"`
 			} `json:"message"`
 			FinishReason string `json:"finish_reason"`
 		} `json:"choices"`
@@ -299,13 +365,30 @@ func decode(data []byte) (Response, error) {
 		resp.Timings = nil
 	}
 	resp.Content, resp.Reasoning = splitThinking(contentText(choice.Message.Content), choice.Message.ReasoningContent+choice.Message.Reasoning)
+	for _, call := range choice.Message.ToolCalls {
+		resp.ToolCalls = append(resp.ToolCalls, ToolCall{ID: call.ID, Name: call.Function.Name, Arguments: call.Function.Arguments})
+	}
+	return finish(resp)
+}
+
+// finish turns the outcome of a complete reply into its error, if any.
+func finish(resp Response) (Response, error) {
 	if resp.FinishReason == "length" {
 		return resp, ErrTruncated
 	}
-	if resp.Content == "" {
+	if resp.Content == "" && len(resp.ToolCalls) == 0 {
 		return resp, ErrEmpty
 	}
 	return resp, nil
+}
+
+type wireToolCall struct {
+	Index    int    `json:"index"`
+	ID       string `json:"id"`
+	Function struct {
+		Name      string `json:"name"`
+		Arguments string `json:"arguments"`
+	} `json:"function"`
 }
 
 // contentText reads content as a string or as an array of text parts.

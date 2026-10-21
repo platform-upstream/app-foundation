@@ -28,6 +28,9 @@ type Reply struct {
 	Usage        *[3]int // prompt, completion and total tokens
 	// Raw, when set, is written as the body verbatim (with Status, default 200).
 	Raw string
+	// Stream, when set, is sent as server-sent events, one "data:" line per element; include
+	// "[DONE]" to end the stream normally.
+	Stream []string
 }
 
 // Server is the fake gateway. URL is its API root (ending in /v1), for llm.Config.BaseURL.
@@ -60,6 +63,17 @@ func NewServer(t testing.TB, reply func(Request) Reply) *Server {
 		status := answer.Status
 		if status == 0 {
 			status = http.StatusOK
+		}
+		if answer.Stream != nil {
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.WriteHeader(status)
+			for _, data := range answer.Stream {
+				io.WriteString(w, "data: "+data+"\n\n")
+				if flusher, ok := w.(http.Flusher); ok {
+					flusher.Flush()
+				}
+			}
+			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status)
