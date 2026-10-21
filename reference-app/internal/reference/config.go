@@ -21,6 +21,7 @@ type Config struct {
 	MemoryAPIKey  string
 	LLMBaseURL    string
 	LLMAPIKey     string
+	LLMModel      string
 }
 
 func ConfigFromEnvironment() (Config, error) {
@@ -35,6 +36,7 @@ func ConfigFromEnvironment() (Config, error) {
 		MemoryAPIKey:  os.Getenv("MEMORY_API_KEY"),
 		LLMBaseURL:    os.Getenv("LLM_BASE_URL"),
 		LLMAPIKey:     os.Getenv("LLM_API_KEY"),
+		LLMModel:      os.Getenv("LLM_MODEL"),
 	}
 	if config.Origin == "" && config.AuthMode == access.ModeLocal {
 		config.Origin = "http://" + config.Address
@@ -64,6 +66,9 @@ func (config Config) Validate() error {
 	}
 	if (config.LLMBaseURL == "") != (config.LLMAPIKey == "") {
 		return errors.New("LLM_BASE_URL and LLM_API_KEY must be configured together")
+	}
+	if config.LLMAPIKey != "" && config.LLMModel == "" {
+		return errors.New("LLM_MODEL is required with LLM_API_KEY")
 	}
 	return nil
 }

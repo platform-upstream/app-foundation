@@ -7,6 +7,7 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
+	foundationllm "github.com/niiku-platform/app-foundation/llm"
 	"io"
 	"net"
 	"net/http"
@@ -234,7 +235,7 @@ func TestMemoryAndLLMSeamsUseFakeServers(t *testing.T) {
 	}
 	handler, err := NewHandler(HandlerConfig{
 		Database: db, Assets: testAssets, Authenticator: authenticator, AllowedOrigins: []string{"http://reference.test"},
-		Memory: memoryClient, LLM: NewLLMClient(llmServer.URL, "llm-key", llmServer.Client()),
+		Memory: memoryClient, LLM: mustLLM(t, foundationllm.Config{BaseURL: llmServer.URL, APIKey: "llm-key", Model: "reference"}),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -385,7 +386,7 @@ func newTestHandlerWithAuthenticator(t *testing.T, authenticator *access.Authent
 		}
 	}
 	if llm == nil {
-		llm = NewLLMClient("", "", nil)
+		llm = mustLLM(t, foundationllm.Config{})
 	}
 	handler, err := NewHandler(HandlerConfig{
 		Database: db, Assets: testAssets, Authenticator: authenticator,
@@ -438,4 +439,13 @@ func doRequest(t *testing.T, handler http.Handler, method, path, body, contentTy
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 	return response
+}
+
+func mustLLM(t *testing.T, config foundationllm.Config) *LLMClient {
+	t.Helper()
+	client, err := NewLLMClient(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return client
 }

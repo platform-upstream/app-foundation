@@ -96,9 +96,6 @@ func New(cfg Config) (*Client, error) {
 // Enabled reports whether the client has an API key.
 func (c *Client) Enabled() bool { return c != nil && c.http != nil }
 
-// Model is the gateway alias the client calls.
-func (c *Client) Model() string { return c.cfg.Model }
-
 // Effort is the reasoning effort. The zero value is sent as "none": no thinking. Backends differ
 // in what an omitted effort means, so a request always carries one.
 type Effort string

@@ -7,7 +7,7 @@ graph so the container build needs no GitHub credential or module cache.
 
 It proves the shared server lifecycle, standard JSON behavior, Cloudflare Access and loopback
 local modes, SQLite migrations and snapshots, embedded React/Vite routing, PWA caching, the exact
-shared Memory client, an app-local local-LLM seam, and the generated Docker/CI/Helm scaffold. The
+shared Memory client, an app-owned seam over the shared `llm` gateway client, and the generated Docker/CI/Helm scaffold. The
 database starts empty; verification writes only to isolated temporary files.
 
 ## Local run
@@ -41,9 +41,10 @@ CF_ACCESS_AUD=replace-me \
 ./.local/foundation-reference
 ```
 
-`MEMORY_BASE_URL` plus `MEMORY_API_KEY` enable the shared Memory seam. `LLM_BASE_URL` plus
-`LLM_API_KEY` enable the deliberately app-local OpenAI-compatible seam; tests use fake HTTP
-servers and never require live inference.
+`MEMORY_BASE_URL` plus `MEMORY_API_KEY` enable the shared Memory seam. `LLM_BASE_URL`,
+`LLM_API_KEY` and `LLM_MODEL` (the app's gateway alias, required with a key) enable the LLM seam
+over app-foundation `llm`; tests use fake HTTP servers (`llm/llmtest`) and never require live
+inference.
 
 ## Reproducible verification
 

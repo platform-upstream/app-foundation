@@ -43,6 +43,9 @@ type Config struct {
 	TeamDomain string
 	Audience   string
 	HTTPClient *http.Client
+	// ServiceTokenClientIDs lists the Cloudflare Access service tokens accepted besides people.
+	// Their assertions carry no subject; the client ID arrives as common_name. Empty accepts none.
+	ServiceTokenClientIDs []string
 }
 
 // RejectFunc writes an application-owned authentication failure response.
@@ -50,8 +53,9 @@ type RejectFunc func(http.ResponseWriter, *http.Request, error)
 
 // Authenticator verifies requests at the application boundary.
 type Authenticator struct {
-	local    bool
-	verifier *oidc.IDTokenVerifier
+	local         bool
+	verifier      *oidc.IDTokenVerifier
+	serviceTokens map[string]struct{}
 }
 
 // New constructs a fail-closed authenticator. Local mode is accepted only for an IP loopback
@@ -72,7 +76,15 @@ func New(cfg Config) (*Authenticator, error) {
 			return nil, errors.New("valid Cloudflare team domain and audience are required")
 		}
 		issuer := "https://" + cfg.TeamDomain
-		return newCloudflare(issuer, issuer+"/cdn-cgi/access/certs", cfg.Audience, cfg.HTTPClient), nil
+		authenticator := newCloudflare(issuer, issuer+"/cdn-cgi/access/certs", cfg.Audience, cfg.HTTPClient)
+		authenticator.serviceTokens = make(map[string]struct{}, len(cfg.ServiceTokenClientIDs))
+		for _, id := range cfg.ServiceTokenClientIDs {
+			if id == "" || strings.TrimSpace(id) != id {
+				return nil, errors.New("service token client IDs must be non-empty without surrounding whitespace")
+			}
+			authenticator.serviceTokens[id] = struct{}{}
+		}
+		return authenticator, nil
 	default:
 		return nil, fmt.Errorf("unsupported access mode %q", mode)
 	}
@@ -114,10 +126,16 @@ func (a *Authenticator) Authenticate(r *http.Request) error {
 		return fmt.Errorf("%w: %v", ErrInvalidAssertion, err)
 	}
 	var claims struct {
-		IssuedAt int64 `json:"iat"`
+		IssuedAt   int64  `json:"iat"`
+		CommonName string `json:"common_name"`
 	}
-	if err := token.Claims(&claims); err != nil || token.Subject == "" || token.Expiry.IsZero() || claims.IssuedAt == 0 {
+	if err := token.Claims(&claims); err != nil || token.Expiry.IsZero() || claims.IssuedAt == 0 {
 		return ErrInvalidAssertion
+	}
+	if token.Subject == "" {
+		if _, accepted := a.serviceTokens[claims.CommonName]; !accepted {
+			return ErrInvalidAssertion
+		}
 	}
 	return nil
 }

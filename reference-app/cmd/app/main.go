@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/niiku-platform/app-foundation/access"
+	"github.com/niiku-platform/app-foundation/llm"
 	"github.com/niiku-platform/app-foundation/memory"
 	"github.com/niiku-platform/app-foundation/reference-app/internal/reference"
 	"github.com/niiku-platform/app-foundation/reference-app/migrations"
@@ -42,7 +43,10 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	llmClient := reference.NewLLMClient(config.LLMBaseURL, config.LLMAPIKey, nil)
+	llmClient, err := reference.NewLLMClient(llm.Config{BaseURL: config.LLMBaseURL, APIKey: config.LLMAPIKey, Model: config.LLMModel})
+	if err != nil {
+		return err
+	}
 	authenticator, err := access.New(access.Config{
 		Mode:       config.AuthMode,
 		Listener:   config.Address,
