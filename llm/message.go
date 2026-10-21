@@ -31,8 +31,12 @@ type ToolCall struct {
 }
 
 func (t Tool) MarshalJSON() ([]byte, error) {
+	parameters := t.Parameters
+	if len(parameters) == 0 {
+		parameters = json.RawMessage(`{"type":"object","properties":{}}`)
+	}
 	return json.Marshal(map[string]any{"type": "function", "function": map[string]any{
-		"name": t.Name, "description": t.Description, "parameters": t.Parameters,
+		"name": t.Name, "description": t.Description, "parameters": parameters,
 	}})
 }
 

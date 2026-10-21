@@ -91,6 +91,49 @@ func TestStreamToolCalls(t *testing.T) {
 	}
 }
 
+func TestStreamParallelToolCallsAndCachedUsage(t *testing.T) {
+	resp, _, err, _ := stream(t, []string{
+		`{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"a","function":{"name":"one","arguments":"{}"}},{"index":1,"id":"b","function":{"name":"two","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}`,
+		`{"choices":[],"usage":{"prompt_tokens":9,"completion_tokens":1,"total_tokens":10,"prompt_tokens_details":{"cached_tokens":7}}}`,
+		`[DONE]`,
+	}, llm.Request{})
+	if err != nil || len(resp.ToolCalls) != 2 || resp.ToolCalls[0].Name != "one" || resp.ToolCalls[1].ID != "b" || resp.Usage.CachedTokens != 7 {
+		t.Fatalf("resp = %+v, err = %v", resp, err)
+	}
+}
+
+func TestStreamBounds(t *testing.T) {
+	if _, _, err, _ := stream(t, []string{`{"choices":[{"delta":{"tool_calls":[{"index":64,"id":"x","function":{"name":"x"}}]}}]}`, `[DONE]`}, llm.Request{}); err == nil {
+		t.Fatal("tool call index 64 accepted")
+	}
+	huge := `{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"` + strings.Repeat("a", 600<<10) + `"}}]}}]}`
+	if _, _, err, _ := stream(t, []string{huge, huge, `[DONE]`}, llm.Request{}); err == nil || !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("oversized tool arguments: %v", err)
+	}
+	disabled, _ := llm.New(llm.Config{})
+	if _, err := disabled.Stream(context.Background(), llm.Request{Messages: []llm.Message{{Role: "user", Content: "Hi"}}, MaxTokens: 10}, nil); !errors.Is(err, llm.ErrDisabled) {
+		t.Fatalf("disabled: %v", err)
+	}
+}
+
+func TestStreamCancelledKeepsPartialReply(t *testing.T) {
+	release := make(chan struct{})
+	server := llmtest.NewServer(t, func(llmtest.Request) llmtest.Reply {
+		return llmtest.Reply{Stream: []string{`{"choices":[{"delta":{"content":"Partial"}}]}`}}
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	resp, err := client(t, server).Stream(ctx, llm.Request{Messages: []llm.Message{{Role: "user", Content: "Hi"}}, MaxTokens: 10}, func(e llm.Event) {
+		if e.Text == "Partial" {
+			cancel()
+			close(release)
+		}
+	})
+	<-release
+	if !errors.Is(err, context.Canceled) || resp.Content != "Partial" {
+		t.Fatalf("resp = %+v, err = %v", resp, err)
+	}
+}
+
 func TestStreamEndings(t *testing.T) {
 	if resp, _, err, _ := stream(t, []string{`{"choices":[{"delta":{"content":"Half"}}]}`}, llm.Request{}); !errors.Is(err, llm.ErrIncomplete) || resp.Content != "Half" {
 		t.Fatalf("no end: %+v %v", resp, err)
@@ -100,6 +143,9 @@ func TestStreamEndings(t *testing.T) {
 	}
 	if _, _, err, _ := stream(t, []string{`{"error":{"message":"model overloaded"}}`}, llm.Request{}); err == nil || !strings.Contains(err.Error(), "model overloaded") {
 		t.Fatalf("error chunk: %v", err)
+	}
+	if resp, _, err, _ := stream(t, []string{`{"choices":[{"delta":{"content":"Done"},"finish_reason":"stop"}]}`}, llm.Request{}); !errors.Is(err, llm.ErrIncomplete) || resp.Content != "Done" {
+		t.Fatalf("finish without [DONE]: %+v %v", resp, err)
 	}
 	if _, _, err, _ := stream(t, []string{`{"choices":[{"delta":{},"finish_reason":"stop"}]}`, `[DONE]`}, llm.Request{}); !errors.Is(err, llm.ErrEmpty) {
 		t.Fatalf("empty: %v", err)

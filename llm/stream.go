@@ -10,8 +10,8 @@ import (
 	"strings"
 )
 
-// ErrIncomplete means a stream ended before the model finished; the partial Response is returned
-// with it.
+// ErrIncomplete means a stream ended without its closing [DONE] (both the gateway and the local
+// runtime send one); the partial Response is returned with it.
 var ErrIncomplete = errors.New("llm: the reply stream ended early")
 
 const (
@@ -40,7 +40,7 @@ type Event struct {
 // Stream sends the request as a stream and calls onEvent for each piece as it arrives. It returns
 // the assembled Response when the stream ends; with an error (ErrIncomplete, ErrTruncated, a
 // cancelled ctx) it still returns what arrived. A backend that answers with a plain JSON reply is
-// read as one.
+// read as one. Frames that are not JSON (keep-alive comments, unknown events) are skipped.
 func (c *Client) Stream(ctx context.Context, req Request, onEvent func(Event)) (Response, error) {
 	if onEvent == nil {
 		onEvent = func(Event) {}
@@ -176,7 +176,7 @@ func (c *Client) Stream(ctx context.Context, req Request, onEvent func(Event)) (
 	if err := scanner.Err(); err != nil {
 		return result, fmt.Errorf("%w: %v", ErrIncomplete, err)
 	}
-	if !done && result.FinishReason == "" {
+	if !done {
 		return result, ErrIncomplete
 	}
 	return finish(result)

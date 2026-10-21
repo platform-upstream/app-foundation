@@ -1,5 +1,7 @@
 // Package llm calls the LLM gateway's OpenAI-compatible chat completions API with one portable
-// request shape, so the same call works whichever model the gateway serves under the app's alias.
+// request shape, so the same call works whichever model the gateway serves under the app's alias:
+// a whole reply (Complete), a reply decoded into a type (CompleteJSON), or a streamed reply with
+// optional tool calls (Stream).
 // A request carries only fields every backend reads: reasoning effort instead of a backend's own
 // thinking switch, an explicit output ceiling, structured output as a strict JSON schema, and
 // sampling only as a best-effort hint. Prompts, schemas, ceilings, deadlines, concurrency and

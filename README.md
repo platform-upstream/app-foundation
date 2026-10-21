@@ -12,7 +12,7 @@ The initial packages are:
   standard `{"error":"..."}` shape with application-owned copy and status semantics.
 - `frontendregistry`: a checked source installer for the React/Vite template, the iOS-safe mobile shell (`pwa-shell`), same-origin JSON client,
   and PWA lifecycle; it shares no theme or layout.
-- `llm`: the portable LLM gateway client (completion and JSON-schema output) and its `llmtest` fake.
+- `llm`: the portable LLM gateway client (completion, JSON-schema output, streaming with tools) and its `llmtest` fake.
 - `memory`: the proven shared Memory service client, including the identical Cook/Watch SQLite
   cache, durable outbox, and conflict behavior.
 - `server`: explicit HTTP server limits, shallow process health, and graceful context-driven
@@ -134,7 +134,12 @@ It never sends a backend's own switches (`chat_template_kwargs`, `thinking_budge
 `repeat_penalty`, `json_object`). A client without an API key is disabled and returns
 `ErrDisabled`, so an app keeps running without inference. Deadlines come from the caller's context;
 there are no retries, and bodies are never logged. `llm/llmtest` is a recording fake gateway for
-tests. Prompts, schemas, ceilings, concurrency, caches and validation remain app-owned, and each app
+tests. `Stream` sends the same request as a stream and reports text, reasoning and tool-call
+events as they arrive; it assembles fragmented tool calls (at most 64, 1 MiB of arguments each),
+moves `<think>` text to the reasoning, reads a plain JSON reply as one, and returns the partial
+reply with `ErrIncomplete` when the stream ends without `[DONE]`. `Usage` includes cached prompt
+tokens; the local runtime's `timings` are passed through raw. Tool loops and tool execution stay
+in the app. Prompts, schemas, ceilings, concurrency, caches and validation remain app-owned, and each app
 keeps its own small interface in front of the client. Design and rollout:
 `docs/llm/shared-llm-client-proposal.md` in the workspace repository.
 
