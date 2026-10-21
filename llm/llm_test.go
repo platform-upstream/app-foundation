@@ -31,7 +31,7 @@ func TestRequestShape(t *testing.T) {
 	}
 	warm := 0.3
 	if _, err := c.Complete(context.Background(), llm.Request{
-		Messages:    []llm.Message{{Role: "user", Parts: []llm.Part{llm.Text("What is this?"), llm.Image("data:image/png;base64,AAAA")}}},
+		Messages:    []llm.Message{{Role: "user", Parts: []llm.Part{llm.Text("What is this?"), llm.Image("data:image/png;base64,AAAA"), llm.File("a.pdf", "data:application/pdf;base64,JVBE")}}},
 		MaxTokens:   100,
 		Effort:      llm.EffortLow,
 		Temperature: &warm,
@@ -52,7 +52,7 @@ func TestRequestShape(t *testing.T) {
 	if second.Body["reasoning_effort"] != "low" || second.Body["temperature"] != 0.3 {
 		t.Fatalf("body = %s", second.Raw)
 	}
-	if !strings.Contains(string(second.Raw), `"content":[{"text":"What is this?","type":"text"},{"image_url":{"url":"data:image/png;base64,AAAA"},"type":"image_url"}]`) {
+	if !strings.Contains(string(second.Raw), `"content":[{"text":"What is this?","type":"text"},{"image_url":{"url":"data:image/png;base64,AAAA"},"type":"image_url"},{"file":{"file_data":"data:application/pdf;base64,JVBE","filename":"a.pdf"},"type":"file"}]`) {
 		t.Fatalf("parts = %s", second.Raw)
 	}
 }

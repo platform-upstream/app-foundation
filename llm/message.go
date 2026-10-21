@@ -48,7 +48,7 @@ func (c ToolCall) MarshalJSON() ([]byte, error) {
 
 // Part is a piece of a multi-part message.
 type Part struct {
-	kind, text, url string
+	kind, text, url, name string
 }
 
 // Text is a text part.
@@ -56,6 +56,11 @@ func Text(text string) Part { return Part{kind: "text", text: text} }
 
 // Image is an image part; url is usually a data URI (data:image/png;base64,...).
 func Image(url string) Part { return Part{kind: "image_url", url: url} }
+
+// File is a document part (OpenAI "file", the bytes as a data URI). It is not portable: through
+// the gateway Claude reads PDF and text files, other types fail there, and the local runtime
+// rejects every file part. Prefer sending extracted text where the app can.
+func File(name, dataURI string) Part { return Part{kind: "file", name: name, url: dataURI} }
 
 func (m Message) MarshalJSON() ([]byte, error) {
 	out := map[string]any{"role": m.Role, "content": m.Content}
@@ -75,6 +80,8 @@ func (m Message) MarshalJSON() ([]byte, error) {
 			parts = append(parts, map[string]any{"type": "text", "text": p.text})
 		case "image_url":
 			parts = append(parts, map[string]any{"type": "image_url", "image_url": map[string]string{"url": p.url}})
+		case "file":
+			parts = append(parts, map[string]any{"type": "file", "file": map[string]string{"filename": p.name, "file_data": p.url}})
 		default:
 			return nil, errors.New("llm: empty message part")
 		}
