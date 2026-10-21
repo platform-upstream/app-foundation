@@ -119,80 +119,6 @@ func (e Effort) wire() (string, error) {
 	return "", fmt.Errorf("llm: unknown effort %q", string(e))
 }
 
-// Message is one chat message: Content, or Parts for text mixed with images. An assistant
-// message that called tools carries ToolCalls; the tool's answer is a "tool" message with
-// ToolCallID.
-type Message struct {
-	Role       string
-	Content    string
-	Parts      []Part
-	ToolCalls  []ToolCall
-	ToolCallID string
-}
-
-// Tool is a function the model may call. Parameters is its JSON schema.
-type Tool struct {
-	Name        string
-	Description string
-	Parameters  json.RawMessage
-}
-
-// ToolCall is one call the model made; Arguments is the JSON text the model wrote.
-type ToolCall struct {
-	ID        string
-	Name      string
-	Arguments string
-}
-
-func (t Tool) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]any{"type": "function", "function": map[string]any{
-		"name": t.Name, "description": t.Description, "parameters": t.Parameters,
-	}})
-}
-
-func (c ToolCall) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]any{"id": c.ID, "type": "function", "function": map[string]string{
-		"name": c.Name, "arguments": c.Arguments,
-	}})
-}
-
-// Part is a piece of a multi-part message.
-type Part struct {
-	kind, text, url string
-}
-
-// Text is a text part.
-func Text(text string) Part { return Part{kind: "text", text: text} }
-
-// Image is an image part; url is usually a data URI (data:image/png;base64,...).
-func Image(url string) Part { return Part{kind: "image_url", url: url} }
-
-func (m Message) MarshalJSON() ([]byte, error) {
-	out := map[string]any{"role": m.Role, "content": m.Content}
-	if len(m.ToolCalls) > 0 {
-		out["tool_calls"] = m.ToolCalls
-	}
-	if m.ToolCallID != "" {
-		out["tool_call_id"] = m.ToolCallID
-	}
-	if len(m.Parts) == 0 {
-		return json.Marshal(out)
-	}
-	parts := make([]map[string]any, 0, len(m.Parts))
-	for _, p := range m.Parts {
-		switch p.kind {
-		case "text":
-			parts = append(parts, map[string]any{"type": "text", "text": p.text})
-		case "image_url":
-			parts = append(parts, map[string]any{"type": "image_url", "image_url": map[string]string{"url": p.url}})
-		default:
-			return nil, errors.New("llm: empty message part")
-		}
-	}
-	out["content"] = parts
-	return json.Marshal(out)
-}
-
 // Request is one completion.
 type Request struct {
 	Messages []Message
@@ -208,11 +134,13 @@ type Request struct {
 	format any
 }
 
-// Usage is the token count the gateway reported.
+// Usage is the token count the gateway reported. CachedTokens is the part of the prompt served
+// from the backend's cache, already included in PromptTokens.
 type Usage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
+	PromptTokens     int
+	CompletionTokens int
+	TotalTokens      int
+	CachedTokens     int
 }
 
 // Response is a finished reply.
@@ -316,113 +244,4 @@ func (c *Client) body(req Request, stream bool) ([]byte, error) {
 		body["stream_options"] = map[string]bool{"include_usage": true}
 	}
 	return json.Marshal(body)
-}
-
-func errorMessage(data []byte) string {
-	var envelope struct {
-		Error json.RawMessage `json:"error"`
-	}
-	text := strings.TrimSpace(string(data))
-	if json.Unmarshal(data, &envelope) == nil && len(envelope.Error) > 0 {
-		var detail struct {
-			Message string `json:"message"`
-		}
-		if json.Unmarshal(envelope.Error, &detail) == nil && detail.Message != "" {
-			text = detail.Message
-		} else if json.Unmarshal(envelope.Error, &text) != nil {
-			text = string(envelope.Error)
-		}
-	}
-	if runes := []rune(text); len(runes) > 240 {
-		text = string(runes[:240])
-	}
-	return text
-}
-
-func decode(data []byte) (Response, error) {
-	var completion struct {
-		Choices []struct {
-			Message struct {
-				Content          json.RawMessage `json:"content"`
-				ReasoningContent string          `json:"reasoning_content"`
-				Reasoning        string          `json:"reasoning"`
-				ToolCalls        []wireToolCall  `json:"tool_calls"`
-			} `json:"message"`
-			FinishReason string `json:"finish_reason"`
-		} `json:"choices"`
-		Usage   *Usage          `json:"usage"`
-		Timings json.RawMessage `json:"timings"`
-	}
-	if err := json.Unmarshal(data, &completion); err != nil || len(completion.Choices) == 0 {
-		return Response{}, errors.New("llm: invalid reply")
-	}
-	choice := completion.Choices[0]
-	resp := Response{FinishReason: choice.FinishReason, Timings: completion.Timings}
-	if completion.Usage != nil {
-		resp.Usage = *completion.Usage
-	}
-	if len(resp.Timings) == 0 || string(resp.Timings) == "null" {
-		resp.Timings = nil
-	}
-	resp.Content, resp.Reasoning = splitThinking(contentText(choice.Message.Content), choice.Message.ReasoningContent+choice.Message.Reasoning)
-	for _, call := range choice.Message.ToolCalls {
-		resp.ToolCalls = append(resp.ToolCalls, ToolCall{ID: call.ID, Name: call.Function.Name, Arguments: call.Function.Arguments})
-	}
-	return finish(resp)
-}
-
-// finish turns the outcome of a complete reply into its error, if any.
-func finish(resp Response) (Response, error) {
-	if resp.FinishReason == "length" {
-		return resp, ErrTruncated
-	}
-	if resp.Content == "" && len(resp.ToolCalls) == 0 {
-		return resp, ErrEmpty
-	}
-	return resp, nil
-}
-
-type wireToolCall struct {
-	Index    int    `json:"index"`
-	ID       string `json:"id"`
-	Function struct {
-		Name      string `json:"name"`
-		Arguments string `json:"arguments"`
-	} `json:"function"`
-}
-
-// contentText reads content as a string or as an array of text parts.
-func contentText(raw json.RawMessage) string {
-	var text string
-	if json.Unmarshal(raw, &text) == nil {
-		return text
-	}
-	var parts []struct {
-		Type string `json:"type"`
-		Text string `json:"text"`
-	}
-	if json.Unmarshal(raw, &parts) == nil {
-		var joined strings.Builder
-		for _, part := range parts {
-			if part.Type == "text" {
-				joined.WriteString(part.Text)
-			}
-		}
-		return joined.String()
-	}
-	return ""
-}
-
-// splitThinking moves a <think>…</think> block that a backend left in the content into the
-// reasoning, unless the backend already returned the reasoning separately.
-func splitThinking(content, reasoning string) (string, string) {
-	if end := strings.LastIndex(content, "</think>"); end >= 0 {
-		thought := strings.TrimSpace(content[:end])
-		thought = strings.TrimSpace(strings.TrimPrefix(thought, "<think>"))
-		if reasoning == "" {
-			reasoning = thought
-		}
-		content = content[end+len("</think>"):]
-	}
-	return strings.TrimSpace(content), strings.TrimSpace(reasoning)
 }

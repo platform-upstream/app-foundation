@@ -115,7 +115,7 @@ func (c *Client) Stream(ctx context.Context, req Request, onEvent func(Event)) (
 		}
 		var chunk struct {
 			Error   json.RawMessage `json:"error"`
-			Usage   *Usage          `json:"usage"`
+			Usage   *wireUsage      `json:"usage"`
 			Timings json.RawMessage `json:"timings"`
 			Choices []struct {
 				Delta struct {
@@ -134,7 +134,7 @@ func (c *Client) Stream(ctx context.Context, req Request, onEvent func(Event)) (
 			return assemble(), &Error{Message: errorMessage([]byte(`{"error":` + string(chunk.Error) + `}`))}
 		}
 		if chunk.Usage != nil {
-			resp.Usage = *chunk.Usage
+			resp.Usage = chunk.Usage.usage()
 		}
 		if len(chunk.Timings) > 0 && string(chunk.Timings) != "null" {
 			resp.Timings = chunk.Timings

@@ -173,3 +173,18 @@ func TestDeadlineIsTheCallersContext(t *testing.T) {
 		t.Fatalf("err = %v, want context.Canceled", err)
 	}
 }
+
+func TestCachedTokens(t *testing.T) {
+	for _, usage := range []string{
+		`{"prompt_tokens":10,"completion_tokens":2,"total_tokens":12,"prompt_tokens_details":{"cached_tokens":8}}`,
+		`{"prompt_tokens":10,"completion_tokens":2,"total_tokens":12,"cached_tokens":8}`,
+	} {
+		server := llmtest.NewServer(t, func(llmtest.Request) llmtest.Reply {
+			return llmtest.Reply{Raw: `{"choices":[{"message":{"content":"x"},"finish_reason":"stop"}],"usage":` + usage + `}`}
+		})
+		resp, err := client(t, server).Complete(context.Background(), llm.Request{Messages: []llm.Message{{Role: "user", Content: "Hi"}}, MaxTokens: 10})
+		if err != nil || resp.Usage.CachedTokens != 8 || resp.Usage.PromptTokens != 10 {
+			t.Fatalf("usage %s: %+v %v", usage, resp.Usage, err)
+		}
+	}
+}
