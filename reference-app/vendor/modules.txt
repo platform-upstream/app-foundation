@@ -18,7 +18,7 @@ github.com/mattn/go-isatty
 # github.com/ncruces/go-strftime v1.0.0
 ## explicit; go 1.17
 github.com/ncruces/go-strftime
-# github.com/niiku-platform/app-foundation v0.8.0 => ../
+# github.com/niiku-platform/app-foundation v0.12.0
 ## explicit; go 1.26
 github.com/niiku-platform/app-foundation/access
 github.com/niiku-platform/app-foundation/httpx
@@ -78,4 +78,3 @@ modernc.org/memory
 modernc.org/sqlite
 modernc.org/sqlite/lib
 modernc.org/sqlite/vtab
-# github.com/niiku-platform/app-foundation => ../

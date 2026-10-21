@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/go-jose/go-jose/v4 v4.1.4
-	github.com/niiku-platform/app-foundation v0.8.0
+	github.com/niiku-platform/app-foundation v0.12.0
 )
 
 require (
@@ -21,5 +21,3 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 	modernc.org/sqlite v1.57.0 // indirect
 )
-
-replace github.com/niiku-platform/app-foundation => ../
