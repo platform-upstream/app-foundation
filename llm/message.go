@@ -5,7 +5,8 @@ import (
 	"errors"
 )
 
-// Message is one chat message: Content, or Parts for text mixed with images. An assistant
+// Message is one chat message: Content, or Parts for text mixed with images (and documents, see
+// File). An assistant
 // message that called tools carries ToolCalls; the tool's answer is a "tool" message with
 // ToolCallID.
 type Message struct {

@@ -4,8 +4,9 @@
 // optional tool calls (Stream).
 // A request carries only fields every backend reads: reasoning effort instead of a backend's own
 // thinking switch, an explicit output ceiling, structured output as a strict JSON schema, and
-// sampling only as a best-effort hint. Prompts, schemas, ceilings, deadlines, concurrency and
-// validation stay with the application.
+// sampling only as a best-effort hint. The one exception is the File part, documented as not
+// portable. Prompts, schemas, ceilings, deadlines, concurrency and validation stay with the
+// application.
 package llm
 
 import (

@@ -131,7 +131,9 @@ an explicit `MaxTokens` ceiling for thinking and answer together, and a reasonin
 (`none` when unset, because backends differ in what an omitted effort means). Structured output is
 a strict JSON schema through `CompleteJSON`; `Temperature` is a best-effort hint that Claude drops.
 It never sends a backend's own switches (`chat_template_kwargs`, `thinking_budget_tokens`, `top_k`,
-`repeat_penalty`, `json_object`). A client without an API key is disabled and returns
+`repeat_penalty`, `json_object`). The one non-portable piece is the `File`
+part for documents: through the gateway Claude reads PDF and text files, the local runtime rejects it
+with a 400, so an app sends extracted text where it can. A client without an API key is disabled and returns
 `ErrDisabled`, so an app keeps running without inference. Deadlines come from the caller's context;
 there are no retries, and bodies are never logged. `llm/llmtest` is a recording fake gateway for
 tests. `Stream` sends the same request as a stream and reports text, reasoning and tool-call
