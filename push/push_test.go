@@ -1,6 +1,7 @@
 package push
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdh"
 	"crypto/rand"
@@ -8,7 +9,9 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -82,6 +85,17 @@ func TestSubjectLosesMailtoPrefix(t *testing.T) {
 	}
 }
 
+func TestRedirectsAreNotFollowed(t *testing.T) {
+	caller := &http.Client{}
+	s := New(open(t), Config{PublicKey: "p", PrivateKey: "k", Subject: "s", HTTPClient: caller})
+	if s.cfg.HTTPClient == caller || s.cfg.HTTPClient.CheckRedirect == nil || caller.CheckRedirect != nil {
+		t.Fatal("the sender must use its own copy of the client that refuses redirects")
+	}
+	if err := s.cfg.HTTPClient.CheckRedirect(nil, nil); !errors.Is(err, http.ErrUseLastResponse) {
+		t.Fatalf("CheckRedirect = %v", err)
+	}
+}
+
 func TestEndpointAllowed(t *testing.T) {
 	for endpoint, want := range map[string]bool{
 		"https://web.push.apple.com/abc":          true,
@@ -96,8 +110,8 @@ func TestEndpointAllowed(t *testing.T) {
 		"https://finance.int.niiku.xyz/api/banks": false,
 		"https://notpush.apple.com/abc":           false,
 	} {
-		if got := EndpointAllowed(endpoint); got != want {
-			t.Errorf("EndpointAllowed(%q) = %v", endpoint, got)
+		if got := endpointAllowed(endpoint); got != want {
+			t.Errorf("endpointAllowed(%q) = %v", endpoint, got)
 		}
 	}
 }
@@ -149,11 +163,18 @@ func TestSendDeliversAndPrunesGone(t *testing.T) {
 		bodies = append(bodies, string(body))
 		status := map[string]int{"ok": 201, "gone": 410, "missing": 404, "failing": 500}[sub.Endpoint[strings.LastIndex(sub.Endpoint, "/")+1:]]
 		if status == 0 {
-			return nil, errors.New("network down")
+			return nil, &url.Error{Op: "Post", URL: sub.Endpoint, Err: errors.New("network down")}
 		}
 		return &http.Response{StatusCode: status, Body: io.NopCloser(strings.NewReader(""))}, nil
 	}
+	var logged bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logged, nil)))
+	defer slog.SetDefault(previous)
 	delivered, err := s.Send(ctx, []byte(`{"title":"Code needed"}`))
+	if strings.Contains(logged.String(), "push.apple.com") || !strings.Contains(logged.String(), "network down") {
+		t.Fatalf("log = %s", logged.String())
+	}
 	if err != nil || delivered != 1 || len(bodies) != 5 || bodies[0] != `{"title":"Code needed"}` {
 		t.Fatalf("Send = %d, %v, bodies %v", delivered, err, bodies)
 	}

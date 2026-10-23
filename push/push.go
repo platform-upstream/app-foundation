@@ -78,6 +78,13 @@ func New(db *sql.DB, cfg Config) *Sender {
 	if cfg.TTL <= 0 {
 		cfg.TTL = time.Hour
 	}
+	client := http.Client{Timeout: sendTimeout}
+	if cfg.HTTPClient != nil {
+		client = *cfg.HTTPClient
+	}
+	// The allowlist checks the stored endpoint only, so a redirect is never followed.
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	cfg.HTTPClient = &client
 	s := &Sender{db: db, cfg: cfg}
 	s.send = func(ctx context.Context, body []byte, sub *webpush.Subscription) (*http.Response, error) {
 		return webpush.SendNotificationWithContext(ctx, body, sub, &webpush.Options{
@@ -101,9 +108,9 @@ func (s *Sender) PublicKey() (string, error) {
 	return s.cfg.PublicKey, nil
 }
 
-// EndpointAllowed accepts only the browser vendors' push services over plain HTTPS, so a stored
+// endpointAllowed accepts only the browser vendors' push services over plain HTTPS, so a stored
 // subscription cannot make the server call an arbitrary address.
-func EndpointAllowed(endpoint string) bool {
+func endpointAllowed(endpoint string) bool {
 	u, err := url.Parse(endpoint)
 	if err != nil || u.Scheme != "https" || u.User != nil || u.Fragment != "" || (u.Port() != "" && u.Port() != "443") {
 		return false
@@ -124,7 +131,7 @@ func (s *Sender) Subscribe(ctx context.Context, sub Subscription, userAgent stri
 	}
 	key, keyErr := base64.RawURLEncoding.DecodeString(strings.TrimRight(sub.Keys.P256dh, "="))
 	auth, authErr := base64.RawURLEncoding.DecodeString(strings.TrimRight(sub.Keys.Auth, "="))
-	if len(sub.Endpoint) > maxEndpoint || !EndpointAllowed(sub.Endpoint) || keyErr != nil || authErr != nil ||
+	if len(sub.Endpoint) > maxEndpoint || !endpointAllowed(sub.Endpoint) || keyErr != nil || authErr != nil ||
 		len(key) != 65 || key[0] != 4 || len(auth) != 16 {
 		return ErrInvalidSubscription
 	}
@@ -171,7 +178,8 @@ func (s *Sender) Subscribed(ctx context.Context) (int, error) {
 
 // Send delivers payload to every stored subscription and returns how many push services accepted
 // it. A subscription the push service reports gone (404, 410) is deleted; other failures are logged
-// without the endpoint and skipped. With push off it does nothing.
+// without the endpoint and skipped. With push off it does nothing. Delivery is sequential with a
+// five-second limit per subscription, so a caller that must not wait runs Send in its own worker.
 func (s *Sender) Send(ctx context.Context, payload []byte) (int, error) {
 	if !s.Enabled() {
 		return 0, nil
@@ -197,7 +205,7 @@ func (s *Sender) Send(ctx context.Context, payload []byte) (int, error) {
 		if ctx.Err() != nil {
 			return delivered, ctx.Err()
 		}
-		if !EndpointAllowed(subs[i].Endpoint) {
+		if !endpointAllowed(subs[i].Endpoint) {
 			slog.Warn("push: stored endpoint rejected")
 			continue
 		}
@@ -205,6 +213,11 @@ func (s *Sender) Send(ctx context.Context, payload []byte) (int, error) {
 		response, err := s.send(sendCtx, payload, &subs[i])
 		cancel()
 		if err != nil {
+			// A *url.Error's text carries the endpoint, a per-device capability URL.
+			var urlErr *url.Error
+			if errors.As(err, &urlErr) {
+				err = urlErr.Err
+			}
 			slog.Warn("push: delivery failed", "error", err)
 			continue
 		}
@@ -212,7 +225,7 @@ func (s *Sender) Send(ctx context.Context, payload []byte) (int, error) {
 		switch {
 		case response.StatusCode == http.StatusNotFound || response.StatusCode == http.StatusGone:
 			if _, err := s.db.ExecContext(ctx, "DELETE FROM push_subscriptions WHERE endpoint = ?", subs[i].Endpoint); err != nil {
-				return delivered, err
+				slog.Warn("push: gone subscription not deleted", "error", err)
 			}
 		case response.StatusCode >= 300:
 			slog.Warn("push: delivery rejected", "status", response.StatusCode)
