@@ -34,8 +34,8 @@ func TestCloudflareGate(t *testing.T) {
 	token := mint(t, key, kid, issuer, aud, "owner", time.Now())
 	req := httptest.NewRequest(http.MethodGet, "/api/items", nil)
 	req.Header.Set(AssertionHeader, token)
-	if err := auth.Authenticate(req); err != nil {
-		t.Fatalf("Authenticate: %v", err)
+	if caller, err := auth.Identify(req); err != nil || !caller.Person() || caller.Subject != "owner" || caller.Local {
+		t.Fatalf("Identify = %+v, %v", caller, err)
 	}
 
 	wrongAudience := mint(t, key, kid, issuer, "wrong", "owner", time.Now())
@@ -103,8 +103,8 @@ func TestServiceTokenAcceptedOnlyWhenListed(t *testing.T) {
 	auth := newCloudflare(issuer, jwks.URL, aud, jwks.Client())
 	auth.serviceTokens = map[string]struct{}{"listed.access": {}}
 	req.Header.Set(AssertionHeader, serviceToken("listed.access"))
-	if err := auth.Authenticate(req); err != nil {
-		t.Fatalf("listed service token: %v", err)
+	if caller, err := auth.Identify(req); err != nil || caller.Person() || caller.ServiceToken != "listed.access" {
+		t.Fatalf("listed service token = %+v, %v", caller, err)
 	}
 	for _, commonName := range []string{"other.access", ""} {
 		req.Header.Set(AssertionHeader, serviceToken(commonName))
@@ -300,7 +300,10 @@ func TestMiddlewareGatesAndUsesAppReject(t *testing.T) {
 			t.Errorf("reject error = %v", err)
 		}
 		http.Error(w, "local only", http.StatusUnauthorized)
-	})(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if caller, ok := CallerFrom(r.Context()); !ok || !caller.Local || caller.Person() {
+			t.Errorf("caller in context = %+v, %v", caller, ok)
+		}
 		w.WriteHeader(http.StatusNoContent)
 	}))
 

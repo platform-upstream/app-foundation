@@ -13,6 +13,8 @@ The initial packages are:
 - `frontendregistry`: a checked source installer for the React/Vite template, the iOS-safe mobile shell (`pwa-shell`), same-origin JSON client,
   and PWA lifecycle; it shares no theme or layout.
 - `llm`: the portable LLM gateway client (completion, JSON-schema output, streaming with tools) and its `llmtest` fake.
+- `push`: Web Push (VAPID) delivery to the subscriptions an app stores, with the endpoint
+  allowlist, subscription bound and the Apple `mailto:` fix that Omni and Console each carried.
 - `memory`: the proven shared Memory service client, including the identical Cook/Watch SQLite
   cache, durable outbox, and conflict behavior.
 - `server`: explicit HTTP server limits, shallow process health, and graceful context-driven
@@ -84,8 +86,10 @@ The legacy `Health(check)` call shape still compiles for `v0.1.0` consumers, but
 use an application-owned readiness route if dependency state genuinely needs to affect routing.
 
 Cloudflare mode verifies one bounded `Cf-Access-Jwt-Assertion`, RS256, issuer, audience, expiry,
-issued-at, and subject against a bounded/cached JWKS fetch. It deliberately returns only success or
-an error: current consumers use Access as an owner gate and do not share an identity model. Local
+issued-at, and subject against a bounded/cached JWKS fetch. Access is an owner gate, so there is no
+shared identity model: `Middleware` only puts a `Caller` into the request context (`CallerFrom`),
+which says whether a person signed in (`Person()`), an accepted service token called, or a local
+request came in, for routes that must refuse service tokens (Finance's bank routes). Local
 mode still requires the literal `127.0.0.1` listener and checks the actual request peer. Mutation
 origin checks accept the configured external origins or the direct request origin, reject ambiguous
 duplicate browser headers, and continue to accept missing `Origin` unless `Sec-Fetch-Site` says

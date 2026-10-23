@@ -2,6 +2,7 @@
 package access
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -99,49 +100,79 @@ func newCloudflare(issuer, certsURL, audience string, client *http.Client) *Auth
 	return &Authenticator{verifier: verifier}
 }
 
+// Caller is who a verified request came from.
+type Caller struct {
+	// Local is set in local mode: a loopback request that carried no assertion.
+	Local bool
+	// Subject is the person's Access subject; empty for a service token.
+	Subject string
+	// ServiceToken is the accepted service token's client ID; empty for a person.
+	ServiceToken string
+}
+
+// Person reports whether a person signed in through Access, as opposed to a service token or a
+// local request.
+func (c Caller) Person() bool { return c.Subject != "" }
+
+type callerKey struct{}
+
+// CallerFrom returns the caller the Middleware verified for this request.
+func CallerFrom(ctx context.Context) (Caller, bool) {
+	caller, ok := ctx.Value(callerKey{}).(Caller)
+	return caller, ok
+}
+
 // Authenticate verifies one request without writing a response.
 func (a *Authenticator) Authenticate(r *http.Request) error {
+	_, err := a.Identify(r)
+	return err
+}
+
+// Identify verifies one request and returns its caller.
+func (a *Authenticator) Identify(r *http.Request) (Caller, error) {
 	if a == nil || (!a.local && a.verifier == nil) {
-		return ErrInvalidAssertion
+		return Caller{}, ErrInvalidAssertion
 	}
 	if a.local {
 		if !loopbackPeer(r.RemoteAddr) {
-			return ErrNonLoopbackPeer
+			return Caller{}, ErrNonLoopbackPeer
 		}
-		return nil
+		return Caller{Local: true}, nil
 	}
 	assertions := r.Header.Values(AssertionHeader)
 	if len(assertions) == 0 || (len(assertions) == 1 && assertions[0] == "") {
-		return ErrMissingAssertion
+		return Caller{}, ErrMissingAssertion
 	}
 	if len(assertions) != 1 {
-		return ErrInvalidAssertion
+		return Caller{}, ErrInvalidAssertion
 	}
 	raw := assertions[0]
 	if len(raw) > maxAssertionSize {
-		return ErrAssertionTooLarge
+		return Caller{}, ErrAssertionTooLarge
 	}
 	token, err := a.verifier.Verify(r.Context(), raw)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidAssertion, err)
+		return Caller{}, fmt.Errorf("%w: %v", ErrInvalidAssertion, err)
 	}
 	var claims struct {
 		IssuedAt   int64  `json:"iat"`
 		CommonName string `json:"common_name"`
 	}
 	if err := token.Claims(&claims); err != nil || token.Expiry.IsZero() || claims.IssuedAt == 0 {
-		return ErrInvalidAssertion
+		return Caller{}, ErrInvalidAssertion
 	}
 	if token.Subject == "" {
 		if _, accepted := a.serviceTokens[claims.CommonName]; !accepted {
-			return ErrInvalidAssertion
+			return Caller{}, ErrInvalidAssertion
 		}
+		return Caller{ServiceToken: claims.CommonName}, nil
 	}
-	return nil
+	return Caller{Subject: token.Subject}, nil
 }
 
-// Middleware gates requests. The reject callback lets each app preserve its existing response
-// copy. A small JSON fallback is used when reject is nil.
+// Middleware gates requests and puts the verified Caller into the request context (CallerFrom).
+// The reject callback lets each app preserve its existing response copy. A small JSON fallback
+// is used when reject is nil.
 func (a *Authenticator) Middleware(reject RejectFunc) func(http.Handler) http.Handler {
 	if reject == nil {
 		reject = func(w http.ResponseWriter, _ *http.Request, _ error) {
@@ -152,11 +183,12 @@ func (a *Authenticator) Middleware(reject RejectFunc) func(http.Handler) http.Ha
 	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if err := a.Authenticate(r); err != nil {
+			caller, err := a.Identify(r)
+			if err != nil {
 				reject(w, r, err)
 				return
 			}
-			next.ServeHTTP(w, r)
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), callerKey{}, caller)))
 		})
 	}
 }
