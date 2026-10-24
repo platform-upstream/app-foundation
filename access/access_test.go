@@ -125,6 +125,41 @@ func TestServiceTokenAcceptedOnlyWhenListed(t *testing.T) {
 	}
 }
 
+func TestCallerCarriesEmailForPeopleOnly(t *testing.T) {
+	key := generateKey(t)
+	const (
+		kid    = "test-key"
+		issuer = "https://test.cloudflareaccess.com"
+		aud    = "test-audience"
+	)
+	jwks := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		writeJWKS(t, w, kid, &key.PublicKey)
+	}))
+	defer jwks.Close()
+	auth := newCloudflare(issuer, jwks.URL, aud, jwks.Client())
+	auth.serviceTokens = map[string]struct{}{"listed.access": {}}
+	claims := func(subject, email, commonName string) string {
+		return sign(t, key, kid, map[string]any{
+			"iss": issuer, "aud": aud, "sub": subject, "email": email, "common_name": commonName,
+			"iat": time.Now().Unix(), "exp": time.Now().Add(5 * time.Minute).Unix(),
+		})
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/items", nil)
+
+	req.Header.Set(AssertionHeader, claims("owner", "Owner@Example.com", ""))
+	if caller, err := auth.Identify(req); err != nil || caller.Email != "Owner@Example.com" || caller.Subject != "owner" {
+		t.Fatalf("person = %+v, %v", caller, err)
+	}
+	req.Header.Set(AssertionHeader, mint(t, key, kid, issuer, aud, "owner", time.Now()))
+	if caller, err := auth.Identify(req); err != nil || caller.Email != "" {
+		t.Fatalf("person without email claim = %+v, %v", caller, err)
+	}
+	req.Header.Set(AssertionHeader, claims("", "token@example.com", "listed.access"))
+	if caller, err := auth.Identify(req); err != nil || caller.Email != "" || caller.ServiceToken != "listed.access" {
+		t.Fatalf("service token = %+v, %v", caller, err)
+	}
+}
+
 func TestBoundedJWKSRefreshAndCooldown(t *testing.T) {
 	key1 := generateKey(t)
 	key2 := generateKey(t)

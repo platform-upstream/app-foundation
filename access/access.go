@@ -106,6 +106,9 @@ type Caller struct {
 	Local bool
 	// Subject is the person's Access subject; empty for a service token.
 	Subject string
+	// Email is the person's email claim as Access reports it; empty for a service token and in
+	// local mode. Apps that map people by address compare it case-insensitively.
+	Email string
 	// ServiceToken is the accepted service token's client ID; empty for a person.
 	ServiceToken string
 }
@@ -157,6 +160,7 @@ func (a *Authenticator) Identify(r *http.Request) (Caller, error) {
 	var claims struct {
 		IssuedAt   int64  `json:"iat"`
 		CommonName string `json:"common_name"`
+		Email      string `json:"email"`
 	}
 	if err := token.Claims(&claims); err != nil || token.Expiry.IsZero() || claims.IssuedAt == 0 {
 		return Caller{}, ErrInvalidAssertion
@@ -167,7 +171,7 @@ func (a *Authenticator) Identify(r *http.Request) (Caller, error) {
 		}
 		return Caller{ServiceToken: claims.CommonName}, nil
 	}
-	return Caller{Subject: token.Subject}, nil
+	return Caller{Subject: token.Subject, Email: claims.Email}, nil
 }
 
 // Middleware gates requests and puts the verified Caller into the request context (CallerFrom).
