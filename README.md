@@ -6,7 +6,8 @@ leaving application routes, schema, copy, policy, and domain code in each app.
 
 The initial packages are:
 
-- `access`: bounded Cloudflare Access JWT verification and loopback-only local mode.
+- `access`: bounded Cloudflare Access JWT verification, loopback-only local mode, and the bearer-key
+  guard for in-cluster internal routes.
 - `appscaffold`: a one-time repository-local Docker/CI/Helm scaffold generator.
 - `httpx`: opt-in request IDs, strict bounded JSON decoding, an explicit JSON API 404, and the
   standard `{"error":"..."}` shape with application-owned copy and status semantics.
@@ -93,8 +94,14 @@ request came in, for routes that must refuse service tokens (Finance's bank rout
 mode still requires the literal `127.0.0.1` listener and checks the actual request peer. Mutation
 origin checks accept the configured external origins or the direct request origin, reject ambiguous
 duplicate browser headers, and continue to accept missing `Origin` unless `Sec-Fetch-Site` says
-`cross-site`, matching the proven Read and Cook behavior. Authorization policy, internal-service
-credentials, rejection headers/copy, and CSP remain application-owned.
+`cross-site`, matching the proven Read and Cook behavior. `Internal` guards the routes an app
+serves outside Access for its sibling apps in the cluster (Omni's mail bridge, Paper's intake): one
+bearer key per caller, compared in constant time, the matched caller name in the context
+(`InternalCallerFrom`), and any request carrying a header Traefik, cloudflared or Access adds
+(`X-Forwarded-*`, `Forwarded`, `X-Real-Ip`, `Cf-Connecting-Ip`, `Cf-Ray`, the Access assertion) is
+refused, so the public hostname never reaches them. A key shorter than 32 bytes, an unset one
+included, closes the route. Authorization policy, which callers exist, their NetworkPolicies,
+rejection headers/copy, and CSP remain application-owned.
 
 SQLite defaults to WAL, foreign keys, a five-second busy timeout, a 4 MiB page cache, and one
 open/idle connection. `OpenReadOnly` accepts an ordinary existing path, adds `mode=ro`, and enforces
