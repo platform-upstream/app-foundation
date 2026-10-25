@@ -40,9 +40,13 @@
 
   /* With black-translucent the web view covers the status bar, but dvh still stops one status bar
      height short (measured: lvh 844, dvh and svh 797); only lvh reaches the physical bottom.
-     :where keeps the specificity of .app-shell, so the keyboard rule below still wins. */
-  :where(html:has(meta[name='apple-mobile-web-app-status-bar-style'][content='black-translucent'])) .app-shell {
-    height: 100lvh;
+     :where keeps the specificity of .app-shell, so the keyboard rule below still wins. The style
+     only exists in a standalone app: in a browser tab lvh is the height with the URL bar
+     retracted, so it would push the nav below the bottom edge (Chrome on Android). */
+  @media (display-mode: standalone) {
+    :where(html:has(meta[name='apple-mobile-web-app-status-bar-style'][content='black-translucent'])) .app-shell {
+      height: 100lvh;
+    }
   }
 
   /* Bottom padding for the application's nav: the home-indicator inset, trimmed so the labels

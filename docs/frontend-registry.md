@@ -53,8 +53,9 @@ are a starting point, not a shared theme.
   scope. Push, share-target, notification, and background-sync behavior remains app-owned.
 - `pwa-shell` is the mobile shell proven by Omni in iOS standalone PWAs: `shell.css` (in
   `@layer foundation`; import it before the app's CSS) keeps the shell in normal flow at `100dvh`,
-  or `100lvh` when `index.html` sets the `black-translucent` status bar (only then does the web
-  view cover the status bar; with the default bar `lvh` pushes the nav off the screen), and follows the visual viewport while the keyboard is open; `viewport.ts` (`useVisualViewport`)
+  or `100lvh` in a standalone app when `index.html` sets the `black-translucent` status bar (only
+  then does the web view cover the status bar; with the default bar, or in a browser tab where `lvh`
+  is the height without the URL bar, `lvh` pushes the nav off the screen), and follows the visual viewport while the keyboard is open; `viewport.ts` (`useVisualViewport`)
   mirrors `visualViewport` into `--app-height`/`--vv-offset-top` and toggles `keyboard-open`;
   `AppShell.tsx` renders shell > sidebar + column (top bar, scrolling `<main>`, nav as the last
   flex child), drops the nav while the keyboard is open and publishes `--shell-nav-height`.

@@ -158,7 +158,7 @@ func TestManifestPathValidation(t *testing.T) {
 }
 
 // Port of Omni's guard: the shell stays in normal flow, on the large viewport under a translucent
-// status bar (dvh otherwise), and the keyboard rule
+// status bar in a standalone app (dvh otherwise), and the keyboard rule
 // never sets a property that turns the shell into a containing block for fixed overlays.
 func TestShellViewportByStatusBarAndNoContainingBlock(t *testing.T) {
 	raw, err := content.ReadFile("sources/pwa-shell/shell.css")
@@ -183,6 +183,9 @@ func TestShellViewportByStatusBarAndNoContainingBlock(t *testing.T) {
 	translucent := rule(`:where(html:has(meta[name='apple-mobile-web-app-status-bar-style'][content='black-translucent'])) .app-shell`)
 	if !strings.Contains(translucent, "height: 100lvh") {
 		t.Fatalf("black-translucent shell lost 100lvh:%s", translucent)
+	}
+	if !regexp.MustCompile(`@media \(display-mode: standalone\) \{\s*:where\(html:has\(meta\[name='apple-mobile-web-app-status-bar-style'\]`).MatchString(css) {
+		t.Fatal("the 100lvh rule must stay inside @media (display-mode: standalone): in a browser tab lvh pushes the nav under the URL bar's height")
 	}
 	if regexp.MustCompile(`(^|[;{\s])position\s*:`).MatchString(shell) {
 		t.Fatalf(".app-shell must stay in normal flow at rest:%s", shell)
