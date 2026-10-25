@@ -43,6 +43,16 @@ func open(t *testing.T) *sql.DB {
 	return db
 }
 
+// openWithAudience is open plus the optional audience column.
+func openWithAudience(t *testing.T) *sql.DB {
+	t.Helper()
+	db := open(t)
+	if _, err := db.Exec("ALTER TABLE push_subscriptions ADD COLUMN audience TEXT NOT NULL DEFAULT ''"); err != nil {
+		t.Fatal(err)
+	}
+	return db
+}
+
 func subscription(t *testing.T, endpoint string) Subscription {
 	t.Helper()
 	key, err := ecdh.P256().GenerateKey(rand.Reader)
@@ -75,6 +85,12 @@ func TestDisabledWithoutFullConfig(t *testing.T) {
 		}
 		if n, err := s.Send(context.Background(), []byte("{}")); n != 0 || err != nil {
 			t.Fatalf("Send = %d, %v", n, err)
+		}
+		if err := s.SubscribeTo(context.Background(), subscription(t, "https://web.push.apple.com/x"), "", "nik"); !errors.Is(err, ErrDisabled) {
+			t.Fatalf("SubscribeTo error = %v", err)
+		}
+		if n, err := s.SendTo(context.Background(), "nik", []byte("{}")); n != 0 || err != nil {
+			t.Fatalf("SendTo = %d, %v", n, err)
 		}
 	}
 }
@@ -180,5 +196,109 @@ func TestSendDeliversAndPrunesGone(t *testing.T) {
 	}
 	if n, _ := s.Subscribed(ctx); n != 3 {
 		t.Fatalf("after pruning 404 and 410: %d subscriptions", n)
+	}
+}
+
+func TestSubscribeToStoresAndMovesAudience(t *testing.T) {
+	ctx := context.Background()
+	db := openWithAudience(t)
+	s := New(db, enabled)
+	audience := func(endpoint string) string {
+		t.Helper()
+		var got string
+		if err := db.QueryRow("SELECT audience FROM push_subscriptions WHERE endpoint = ?", endpoint).Scan(&got); err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	if err := s.SubscribeTo(ctx, subscription(t, "https://example.com/a"), "", "nik"); !errors.Is(err, ErrInvalidSubscription) {
+		t.Fatalf("foreign endpoint error = %v", err)
+	}
+	phone := subscription(t, "https://web.push.apple.com/phone")
+	if err := s.SubscribeTo(ctx, phone, "Safari", "nik"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SubscribeTo(ctx, subscription(t, "https://fcm.googleapis.com/fcm/send/tablet"), "Chrome", "kimi"); err != nil {
+		t.Fatal(err)
+	}
+	if got := audience(phone.Endpoint); got != "nik" {
+		t.Fatalf("phone audience = %q", got)
+	}
+	// The phone now belongs to Kimi.
+	if err := s.SubscribeTo(ctx, subscription(t, phone.Endpoint), "Safari", "kimi"); err != nil {
+		t.Fatal(err)
+	}
+	if got := audience(phone.Endpoint); got != "kimi" {
+		t.Fatalf("phone audience after move = %q", got)
+	}
+	if n, _ := s.Subscribed(ctx); n != 2 {
+		t.Fatalf("subscribed = %d", n)
+	}
+	// Subscribe leaves the column alone: the default for a new row, the stored value on refresh.
+	if err := s.Subscribe(ctx, subscription(t, phone.Endpoint), "Safari"); err != nil {
+		t.Fatal(err)
+	}
+	if got := audience(phone.Endpoint); got != "kimi" {
+		t.Fatalf("phone audience after Subscribe = %q", got)
+	}
+	for i := 2; i < MaxSubscriptions; i++ {
+		if err := s.SubscribeTo(ctx, subscription(t, "https://web.push.apple.com/"+strings.Repeat("a", i)), "", "nik"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.SubscribeTo(ctx, subscription(t, "https://web.push.apple.com/new"), "", "kimi"); !errors.Is(err, ErrSubscriptionLimit) {
+		t.Fatalf("limit error = %v", err)
+	}
+}
+
+func TestSendToDeliversOnlyToAudience(t *testing.T) {
+	ctx := context.Background()
+	s := New(openWithAudience(t), enabled)
+	for endpoint, person := range map[string]string{"nik-phone": "nik", "nik-laptop": "nik", "kimi-phone": "kimi"} {
+		if err := s.SubscribeTo(ctx, subscription(t, "https://web.push.apple.com/"+endpoint), "", person); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.Subscribe(ctx, subscription(t, "https://web.push.apple.com/shared"), ""); err != nil {
+		t.Fatal(err)
+	}
+	var reached []string
+	s.send = func(_ context.Context, body []byte, sub *webpush.Subscription) (*http.Response, error) {
+		reached = append(reached, sub.Endpoint[strings.LastIndex(sub.Endpoint, "/")+1:])
+		return &http.Response{StatusCode: 201, Body: io.NopCloser(strings.NewReader(""))}, nil
+	}
+	delivered, err := s.SendTo(ctx, "kimi", []byte(`{"title":"Nik added an idea"}`))
+	if err != nil || delivered != 1 || len(reached) != 1 || reached[0] != "kimi-phone" {
+		t.Fatalf("SendTo kimi = %d, %v, reached %v", delivered, err, reached)
+	}
+	reached = nil
+	if delivered, err := s.SendTo(ctx, "nik", []byte("{}")); err != nil || delivered != 2 || len(reached) != 2 {
+		t.Fatalf("SendTo nik = %d, %v, reached %v", delivered, err, reached)
+	}
+	reached = nil
+	if delivered, err := s.SendTo(ctx, "nobody", []byte("{}")); err != nil || delivered != 0 || len(reached) != 0 {
+		t.Fatalf("SendTo nobody = %d, %v, reached %v", delivered, err, reached)
+	}
+	// Send still reaches every device, whatever its audience.
+	if delivered, err := s.Send(ctx, []byte("{}")); err != nil || delivered != 4 {
+		t.Fatalf("Send = %d, %v", delivered, err)
+	}
+}
+
+func TestSubscribeAndSendWithoutAudienceColumn(t *testing.T) {
+	ctx := context.Background()
+	s := New(open(t), enabled)
+	if err := s.Subscribe(ctx, subscription(t, "https://web.push.apple.com/a"), ""); err != nil {
+		t.Fatal(err)
+	}
+	s.send = func(context.Context, []byte, *webpush.Subscription) (*http.Response, error) {
+		return &http.Response{StatusCode: 201, Body: io.NopCloser(strings.NewReader(""))}, nil
+	}
+	if delivered, err := s.Send(ctx, []byte("{}")); err != nil || delivered != 1 {
+		t.Fatalf("Send = %d, %v", delivered, err)
+	}
+	// The audience methods need the column; without it they fail rather than send to everyone.
+	if _, err := s.SendTo(ctx, "nik", []byte("{}")); err == nil {
+		t.Fatal("SendTo without the audience column succeeded")
 	}
 }

@@ -14,6 +14,14 @@
 // and exposes PublicKey, Subscribe and Unsubscribe through its own handlers. Send delivers one
 // payload to every stored subscription and is synchronous: an application that must not wait runs
 // it in its own worker.
+//
+// An application with several people may add an audience to the table:
+//
+//	audience TEXT NOT NULL DEFAULT ''
+//
+// and store each device with SubscribeTo, then reach one person's devices with SendTo. Only
+// SubscribeTo and SendTo read or write the column, so an application without it keeps working
+// with Subscribe and Send unchanged.
 package push
 
 import (
@@ -126,6 +134,32 @@ func endpointAllowed(endpoint string) bool {
 
 // Subscribe stores or refreshes a subscription.
 func (s *Sender) Subscribe(ctx context.Context, sub Subscription, userAgent string) error {
+	return s.subscribe(ctx, sub, userAgent, func(tx *sql.Tx, userAgent, createdAt string) error {
+		_, err := tx.ExecContext(ctx, `INSERT INTO push_subscriptions (endpoint, p256dh, auth, expiration_time, user_agent, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT (endpoint) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth,
+			expiration_time = excluded.expiration_time, user_agent = excluded.user_agent`,
+			sub.Endpoint, sub.Keys.P256dh, sub.Keys.Auth, sub.ExpirationTime, userAgent, createdAt)
+		return err
+	})
+}
+
+// SubscribeTo stores or refreshes a subscription for one audience, such as a person. A stored
+// endpoint moves to the new audience: the device now belongs to someone else. The table needs the
+// audience column (see the package documentation).
+func (s *Sender) SubscribeTo(ctx context.Context, sub Subscription, userAgent, audience string) error {
+	return s.subscribe(ctx, sub, userAgent, func(tx *sql.Tx, userAgent, createdAt string) error {
+		_, err := tx.ExecContext(ctx, `INSERT INTO push_subscriptions (endpoint, p256dh, auth, expiration_time, user_agent, created_at, audience)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT (endpoint) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth,
+			expiration_time = excluded.expiration_time, user_agent = excluded.user_agent, audience = excluded.audience`,
+			sub.Endpoint, sub.Keys.P256dh, sub.Keys.Auth, sub.ExpirationTime, userAgent, createdAt, audience)
+		return err
+	})
+}
+
+// subscribe validates sub, enforces MaxSubscriptions and runs upsert in one transaction.
+func (s *Sender) subscribe(ctx context.Context, sub Subscription, userAgent string, upsert func(tx *sql.Tx, userAgent, createdAt string) error) error {
 	if !s.Enabled() {
 		return ErrDisabled
 	}
@@ -150,11 +184,7 @@ func (s *Sender) Subscribe(ctx context.Context, sub Subscription, userAgent stri
 	if len(userAgent) > 300 {
 		userAgent = userAgent[:300]
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO push_subscriptions (endpoint, p256dh, auth, expiration_time, user_agent, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)
-		ON CONFLICT (endpoint) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth,
-			expiration_time = excluded.expiration_time, user_agent = excluded.user_agent`,
-		sub.Endpoint, sub.Keys.P256dh, sub.Keys.Auth, sub.ExpirationTime, userAgent, time.Now().UTC().Format(time.RFC3339)); err != nil {
+	if err := upsert(tx, userAgent, time.Now().UTC().Format(time.RFC3339)); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -181,10 +211,21 @@ func (s *Sender) Subscribed(ctx context.Context) (int, error) {
 // without the endpoint and skipped. With push off it does nothing. Delivery is sequential with a
 // five-second limit per subscription, so a caller that must not wait runs Send in its own worker.
 func (s *Sender) Send(ctx context.Context, payload []byte) (int, error) {
+	return s.deliver(ctx, payload, "SELECT endpoint, p256dh, auth FROM push_subscriptions LIMIT ?", MaxSubscriptions)
+}
+
+// SendTo is Send for the subscriptions stored with SubscribeTo under audience only. The table needs
+// the audience column (see the package documentation).
+func (s *Sender) SendTo(ctx context.Context, audience string, payload []byte) (int, error) {
+	return s.deliver(ctx, payload, "SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE audience = ? LIMIT ?", audience, MaxSubscriptions)
+}
+
+// deliver sends payload to the subscriptions query selects as (endpoint, p256dh, auth).
+func (s *Sender) deliver(ctx context.Context, payload []byte, query string, args ...any) (int, error) {
 	if !s.Enabled() {
 		return 0, nil
 	}
-	rows, err := s.db.QueryContext(ctx, "SELECT endpoint, p256dh, auth FROM push_subscriptions LIMIT ?", MaxSubscriptions)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return 0, err
 	}
