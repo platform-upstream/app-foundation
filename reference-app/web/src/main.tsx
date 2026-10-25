@@ -21,4 +21,6 @@ createRoot(root).render(
   </React.StrictMode>,
 );
 
-registerServiceWorker();
+// Production only: the update check compares the page's entry script with its own bundle, which
+// never match under the Vite dev server, so the page would reload in a loop.
+if (import.meta.env.PROD) registerServiceWorker();
