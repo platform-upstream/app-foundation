@@ -19,12 +19,12 @@ import (
 	"testing/fstest"
 	"time"
 
-	jose "github.com/go-jose/go-jose/v4"
 	"github.com/castillo-platform/app-foundation/access"
 	"github.com/castillo-platform/app-foundation/httpx"
 	"github.com/castillo-platform/app-foundation/memory"
 	"github.com/castillo-platform/app-foundation/reference-app/migrations"
 	"github.com/castillo-platform/app-foundation/server"
+	jose "github.com/go-jose/go-jose/v4"
 )
 
 var testAssets = fstest.MapFS{

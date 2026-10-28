@@ -114,17 +114,17 @@ func TestRedirectsAreNotFollowed(t *testing.T) {
 
 func TestEndpointAllowed(t *testing.T) {
 	for endpoint, want := range map[string]bool{
-		"https://web.push.apple.com/abc":          true,
-		"https://fcm.googleapis.com/fcm/send/abc": true,
-		"https://x.notify.windows.com/w":          true,
-		"https://WEB.PUSH.APPLE.COM/abc":          true,
-		"http://web.push.apple.com/abc":           false,
-		"https://evilpush.apple.com.example/abc":  false,
-		"https://user@web.push.apple.com/abc":     false,
-		"https://web.push.apple.com:8443/abc":     false,
-		"https://web.push.apple.com/abc#fragment": false,
+		"https://web.push.apple.com/abc":              true,
+		"https://fcm.googleapis.com/fcm/send/abc":     true,
+		"https://x.notify.windows.com/w":              true,
+		"https://WEB.PUSH.APPLE.COM/abc":              true,
+		"http://web.push.apple.com/abc":               false,
+		"https://evilpush.apple.com.example/abc":      false,
+		"https://user@web.push.apple.com/abc":         false,
+		"https://web.push.apple.com:8443/abc":         false,
+		"https://web.push.apple.com/abc#fragment":     false,
 		"https://finance.int.jprinzbach.de/api/banks": false,
-		"https://notpush.apple.com/abc":           false,
+		"https://notpush.apple.com/abc":               false,
 	} {
 		if got := endpointAllowed(endpoint); got != want {
 			t.Errorf("endpointAllowed(%q) = %v", endpoint, got)
