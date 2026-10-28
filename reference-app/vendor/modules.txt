@@ -18,16 +18,16 @@ github.com/mattn/go-isatty
 # github.com/ncruces/go-strftime v1.0.0
 ## explicit; go 1.17
 github.com/ncruces/go-strftime
-# github.com/niiku-platform/app-foundation v0.12.0
+# github.com/castillo-platform/app-foundation v0.12.0
 ## explicit; go 1.26
-github.com/niiku-platform/app-foundation/access
-github.com/niiku-platform/app-foundation/httpx
-github.com/niiku-platform/app-foundation/llm
-github.com/niiku-platform/app-foundation/llm/llmtest
-github.com/niiku-platform/app-foundation/memory
-github.com/niiku-platform/app-foundation/server
-github.com/niiku-platform/app-foundation/sqlite
-github.com/niiku-platform/app-foundation/web
+github.com/castillo-platform/app-foundation/access
+github.com/castillo-platform/app-foundation/httpx
+github.com/castillo-platform/app-foundation/llm
+github.com/castillo-platform/app-foundation/llm/llmtest
+github.com/castillo-platform/app-foundation/memory
+github.com/castillo-platform/app-foundation/server
+github.com/castillo-platform/app-foundation/sqlite
+github.com/castillo-platform/app-foundation/web
 # github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec
 ## explicit; go 1.12
 github.com/remyoudompheng/bigfft

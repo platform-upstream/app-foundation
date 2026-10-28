@@ -1,10 +1,10 @@
-module github.com/niiku-platform/app-foundation/reference-app
+module github.com/castillo-platform/app-foundation/reference-app
 
 go 1.26.0
 
 require (
 	github.com/go-jose/go-jose/v4 v4.1.4
-	github.com/niiku-platform/app-foundation v0.12.0
+	github.com/castillo-platform/app-foundation v0.12.0
 )
 
 require (

@@ -164,8 +164,8 @@ keeps its own small interface in front of the client. Design and rollout:
 Developers and release automation that resolve the private module need GitHub authentication and:
 
 ```bash
-go env -w GOPRIVATE=github.com/niiku-platform/*
-go get github.com/niiku-platform/app-foundation@v0.1.0
+go env -w GOPRIVATE=github.com/castillo-platform/*
+go get github.com/castillo-platform/app-foundation@v0.1.0
 ```
 
 Consumers should pin an exact release. For container builds, resolve the module outside the image

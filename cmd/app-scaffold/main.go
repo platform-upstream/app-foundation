@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/niiku-platform/app-foundation/appscaffold"
+	"github.com/castillo-platform/app-foundation/appscaffold"
 )
 
 func main() {

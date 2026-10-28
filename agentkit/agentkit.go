@@ -17,7 +17,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/niiku-platform/app-foundation/access"
+	"github.com/castillo-platform/app-foundation/access"
 )
 
 // Class is what a tool may change (skill rule 13). Higher classes include the lower ones in a

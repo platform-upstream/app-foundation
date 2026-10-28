@@ -3,7 +3,7 @@ package reference
 import (
 	"testing"
 
-	"github.com/niiku-platform/app-foundation/access"
+	"github.com/castillo-platform/app-foundation/access"
 )
 
 func TestConfigValidation(t *testing.T) {

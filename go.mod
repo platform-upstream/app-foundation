@@ -1,4 +1,4 @@
-module github.com/niiku-platform/app-foundation
+module github.com/castillo-platform/app-foundation
 
 go 1.26.0
 

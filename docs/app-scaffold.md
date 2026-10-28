@@ -8,10 +8,10 @@ Generation rejects symlink parents and uses root-confined atomic writes so repos
 cannot redirect output outside the requested target.
 
 ```bash
-go run github.com/niiku-platform/app-foundation/cmd/app-scaffold@v0.8.0 \
+go run github.com/castillo-platform/app-foundation/cmd/app-scaffold@v0.8.0 \
   -target . \
   -name example-app \
-  -image zot.int.niiku.xyz/niiku-platform/example-app
+  -image zot.int.jprinzbach.de/castillo-platform/example-app
 ```
 
 The name must be a DNS label. The image argument is a repository without a tag. Generate into a
@@ -19,7 +19,7 @@ repository that already follows the standard `cmd/`, `internal/`, `migrations/`,
 then review every generated file before committing it.
 
 The Dockerfile checks the registry-owned frontend files (`pwa`, `pwa-shell`); add the tool to
-`go.mod` first (`go get -tool github.com/niiku-platform/app-foundation/cmd/frontend-registry`,
+`go.mod` first (`go get -tool github.com/castillo-platform/app-foundation/cmd/frontend-registry`,
 then `go mod vendor`).
 
 The generated `AGENTS.md` is a stub: fill in the first paragraph and the app-specific look, keep
@@ -33,8 +33,8 @@ and accepts no credential argument or secret mount. Resolve an exact private fou
 the trusted workstation and vendor it before building:
 
 ```bash
-go env -w GOPRIVATE=github.com/niiku-platform/*
-go get github.com/niiku-platform/app-foundation@v0.8.0
+go env -w GOPRIVATE=github.com/castillo-platform/*
+go get github.com/castillo-platform/app-foundation@v0.8.0
 go mod tidy
 go mod vendor
 podman build -t example-app:local .

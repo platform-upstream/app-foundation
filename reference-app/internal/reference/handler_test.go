@@ -7,7 +7,7 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
-	foundationllm "github.com/niiku-platform/app-foundation/llm"
+	foundationllm "github.com/castillo-platform/app-foundation/llm"
 	"io"
 	"net"
 	"net/http"
@@ -20,11 +20,11 @@ import (
 	"time"
 
 	jose "github.com/go-jose/go-jose/v4"
-	"github.com/niiku-platform/app-foundation/access"
-	"github.com/niiku-platform/app-foundation/httpx"
-	"github.com/niiku-platform/app-foundation/memory"
-	"github.com/niiku-platform/app-foundation/reference-app/migrations"
-	"github.com/niiku-platform/app-foundation/server"
+	"github.com/castillo-platform/app-foundation/access"
+	"github.com/castillo-platform/app-foundation/httpx"
+	"github.com/castillo-platform/app-foundation/memory"
+	"github.com/castillo-platform/app-foundation/reference-app/migrations"
+	"github.com/castillo-platform/app-foundation/server"
 )
 
 var testAssets = fstest.MapFS{

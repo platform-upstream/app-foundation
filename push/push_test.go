@@ -18,7 +18,7 @@ import (
 
 	webpush "github.com/SherClockHolmes/webpush-go"
 
-	"github.com/niiku-platform/app-foundation/sqlite"
+	"github.com/castillo-platform/app-foundation/sqlite"
 )
 
 const schema = `CREATE TABLE push_subscriptions (
@@ -123,7 +123,7 @@ func TestEndpointAllowed(t *testing.T) {
 		"https://user@web.push.apple.com/abc":     false,
 		"https://web.push.apple.com:8443/abc":     false,
 		"https://web.push.apple.com/abc#fragment": false,
-		"https://finance.int.niiku.xyz/api/banks": false,
+		"https://finance.int.jprinzbach.de/api/banks": false,
 		"https://notpush.apple.com/abc":           false,
 	} {
 		if got := endpointAllowed(endpoint); got != want {

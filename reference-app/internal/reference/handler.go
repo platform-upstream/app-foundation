@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/niiku-platform/app-foundation/access"
-	"github.com/niiku-platform/app-foundation/httpx"
-	"github.com/niiku-platform/app-foundation/memory"
-	"github.com/niiku-platform/app-foundation/server"
-	foundationweb "github.com/niiku-platform/app-foundation/web"
+	"github.com/castillo-platform/app-foundation/access"
+	"github.com/castillo-platform/app-foundation/httpx"
+	"github.com/castillo-platform/app-foundation/memory"
+	"github.com/castillo-platform/app-foundation/server"
+	foundationweb "github.com/castillo-platform/app-foundation/web"
 )
 
 type MemoryClient interface {

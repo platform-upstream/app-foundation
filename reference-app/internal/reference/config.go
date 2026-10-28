@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/niiku-platform/app-foundation/access"
+	"github.com/castillo-platform/app-foundation/access"
 )
 
 type Config struct {

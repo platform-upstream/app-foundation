@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/niiku-platform/app-foundation/llm"
+	"github.com/castillo-platform/app-foundation/llm"
 )
 
 var ErrLLMNotConfigured = errors.New("llm_not_configured")

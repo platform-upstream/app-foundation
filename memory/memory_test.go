@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	foundationsqlite "github.com/niiku-platform/app-foundation/sqlite"
+	foundationsqlite "github.com/castillo-platform/app-foundation/sqlite"
 )
 
 func TestNotesCachesFallsBackAndOverlaysPending(t *testing.T) {

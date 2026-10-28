@@ -2,7 +2,7 @@
 
 This local-only application is the Phase 1 integration proof for `app-foundation`. It is not a
 production workload and has no deployment entry in the platform repositories. The committed
-module pins `github.com/niiku-platform/app-foundation v0.8.0` exactly and vendors that resolved
+module pins `github.com/castillo-platform/app-foundation v0.8.0` exactly and vendors that resolved
 graph so the container build needs no GitHub credential or module cache.
 
 It proves the shared server lifecycle, standard JSON behavior, Cloudflare Access and loopback
@@ -28,7 +28,7 @@ APP_DB=.local/reference.sqlite ./.local/foundation-reference
 
 The safe default is loopback-only local auth at `127.0.0.1:8099`. The app intentionally uses a
 root-relative production asset base so direct SPA routes work; from this workstation the human
-preview therefore uses `https://code.niiku.xyz/absproxy/8099/`.
+preview therefore uses `https://code.jprinzbach.de/absproxy/8099/`.
 
 Cloudflare mode requires all three external values and protects both documents and APIs while
 leaving the shallow process health endpoint public:

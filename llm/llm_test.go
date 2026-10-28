@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/niiku-platform/app-foundation/llm"
-	"github.com/niiku-platform/app-foundation/llm/llmtest"
+	"github.com/castillo-platform/app-foundation/llm"
+	"github.com/castillo-platform/app-foundation/llm/llmtest"
 )
 
 func client(t *testing.T, server *llmtest.Server) *llm.Client {

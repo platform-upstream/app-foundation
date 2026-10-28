@@ -8,13 +8,13 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/niiku-platform/app-foundation/access"
-	"github.com/niiku-platform/app-foundation/llm"
-	"github.com/niiku-platform/app-foundation/memory"
-	"github.com/niiku-platform/app-foundation/reference-app/internal/reference"
-	"github.com/niiku-platform/app-foundation/reference-app/migrations"
-	webassets "github.com/niiku-platform/app-foundation/reference-app/web"
-	"github.com/niiku-platform/app-foundation/server"
+	"github.com/castillo-platform/app-foundation/access"
+	"github.com/castillo-platform/app-foundation/llm"
+	"github.com/castillo-platform/app-foundation/memory"
+	"github.com/castillo-platform/app-foundation/reference-app/internal/reference"
+	"github.com/castillo-platform/app-foundation/reference-app/migrations"
+	webassets "github.com/castillo-platform/app-foundation/reference-app/web"
+	"github.com/castillo-platform/app-foundation/server"
 )
 
 func main() {

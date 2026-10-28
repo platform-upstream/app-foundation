@@ -102,7 +102,7 @@ func TestNotFound(t *testing.T) {
 }
 
 func TestSameOrigin(t *testing.T) {
-	handler := SameOrigin([]string{"https://read.niiku.xyz", "https://code.niiku.xyz"}, nil)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	handler := SameOrigin([]string{"https://read.jprinzbach.de", "https://code.jprinzbach.de"}, nil)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	for _, tc := range []struct {
@@ -111,13 +111,13 @@ func TestSameOrigin(t *testing.T) {
 		want                            int
 	}{
 		{"read bypass", http.MethodGet, "https://evil.example", "cross-site", false, 204},
-		{"production", http.MethodPost, "https://read.niiku.xyz", "same-origin", false, 204},
-		{"development proxy", http.MethodPost, "https://code.niiku.xyz", "same-site", false, 204},
+		{"production", http.MethodPost, "https://read.jprinzbach.de", "same-origin", false, 204},
+		{"development proxy", http.MethodPost, "https://code.jprinzbach.de", "same-site", false, 204},
 		{"direct loopback", http.MethodPost, "http://127.0.0.1:8096", "same-origin", false, 204},
 		{"direct TLS", http.MethodPost, "https://127.0.0.1:8096", "same-origin", true, 204},
 		{"missing origin", http.MethodPost, "", "none", false, 204},
 		{"cross site", http.MethodPost, "https://evil.example", "cross-site", false, 403},
-		{"allowed but cross site", http.MethodPost, "https://read.niiku.xyz", "cross-site", false, 403},
+		{"allowed but cross site", http.MethodPost, "https://read.jprinzbach.de", "cross-site", false, 403},
 		{"origin mismatch", http.MethodPost, "https://evil.example", "same-site", false, 403},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

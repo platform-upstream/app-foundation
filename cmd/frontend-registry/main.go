@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/niiku-platform/app-foundation/frontendregistry"
+	"github.com/castillo-platform/app-foundation/frontendregistry"
 )
 
 func main() {

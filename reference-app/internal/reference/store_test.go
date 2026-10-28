@@ -8,8 +8,8 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/niiku-platform/app-foundation/reference-app/migrations"
-	foundationsqlite "github.com/niiku-platform/app-foundation/sqlite"
+	"github.com/castillo-platform/app-foundation/reference-app/migrations"
+	foundationsqlite "github.com/castillo-platform/app-foundation/sqlite"
 )
 
 func TestFreshAndUpgradeMigrations(t *testing.T) {
