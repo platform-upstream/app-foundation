@@ -75,26 +75,75 @@ func ParseCallers(text string) (Callers, error) {
 // tunnel headers), and the matched caller becomes the token's user, so the SDK binds each session to
 // its caller. A key without a ceiling, or a ceiling without a key, is refused at start (Check).
 func Guard(keys map[string]string, callers Callers, next http.Handler) http.Handler {
+	return GuardRemote(keys, nil, callers, next)
+}
+
+// GuardRemote is Guard with a second door: remote holds the keys of callers outside the cluster
+// (agents on a hosted runner, workspace docs/agent-runtime-plan.md, Identity B), which reach /mcp
+// through the tunnel on a path bypassed in Cloudflare Access. A request with tunnel headers is
+// checked against remote only (access.Remote), one without against keys only (access.Internal),
+// so an in-cluster key such as toolhive's is refused from outside. CheckRemote caps remote
+// ceilings at prepare.
+func GuardRemote(keys, remote map[string]string, callers Callers, next http.Handler) http.Handler {
 	verify := func(ctx context.Context, _ string, _ *http.Request) (*auth.TokenInfo, error) {
 		name, ok := access.InternalCallerFrom(ctx)
-		if !ok || callers[name] == 0 {
+		ceiling := Edit
+		if !ok {
+			name, ok = access.RemoteCallerFrom(ctx)
+			ceiling = Prepare
+		}
+		// A remote caller above prepare is refused here too, not only by CheckRemote at start.
+		if !ok || callers[name] == 0 || callers[name] > ceiling {
 			return nil, auth.ErrInvalidToken
 		}
 		return &auth.TokenInfo{UserID: name, Expiration: time.Now().Add(time.Hour)}, nil
 	}
-	return access.Internal(keys, nil)(auth.RequireBearerToken(verify, nil)(next))
+	bearer := auth.RequireBearerToken(verify, nil)(next)
+	internal := access.Internal(keys, nil)(bearer)
+	outside := access.Remote(remote, nil)(bearer)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if access.Forwarded(r) {
+			outside.ServeHTTP(w, r)
+			return
+		}
+		internal.ServeHTTP(w, r)
+	})
 }
 
 // Check reports a caller with a key but no ceiling, or a ceiling but no usable key.
 func Check(keys map[string]string, callers Callers) error {
-	for name, key := range keys {
+	return CheckRemote(keys, nil, callers)
+}
+
+// CheckRemote is Check over both doors of GuardRemote: a name or a key used twice, or a remote
+// caller above prepare, is refused too.
+func CheckRemote(keys, remote map[string]string, callers Callers) error {
+	all := map[string]string{}
+	seen := map[string]string{}
+	for _, door := range []map[string]string{keys, remote} {
+		for name, key := range door {
+			if _, dup := all[name]; dup {
+				return fmt.Errorf("MCP caller %s has a key on both doors", name)
+			}
+			if other, dup := seen[key]; dup && key != "" {
+				return fmt.Errorf("MCP callers %s and %s share a key", other, name)
+			}
+			all[name], seen[key] = key, name
+		}
+	}
+	for name, key := range all {
 		if key != "" && callers[name] == 0 {
 			return fmt.Errorf("MCP caller %s has a key but no ceiling", name)
 		}
 	}
 	for name := range callers {
-		if len(keys[name]) < access.MinInternalKeyLength {
+		if len(all[name]) < access.MinInternalKeyLength {
 			return fmt.Errorf("MCP caller %s has a ceiling but no key of at least %d bytes", name, access.MinInternalKeyLength)
+		}
+	}
+	for name := range remote {
+		if callers[name] > Prepare {
+			return fmt.Errorf("MCP caller %s comes from outside the cluster; its ceiling is at most prepare", name)
 		}
 	}
 	return nil

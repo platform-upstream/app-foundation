@@ -106,3 +106,35 @@ func TestInternalWithoutUsableKeyIsClosed(t *testing.T) {
 		t.Fatal("caller outside the guard")
 	}
 }
+
+func TestRemoteAdmitsForwardedKeyAndKeepsItsOwnCaller(t *testing.T) {
+	key := strings.Repeat("r", 32)
+	var internal, remote bool
+	guard := Remote(map[string]string{"agent-x": key, "short": "s"}, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, internal = InternalCallerFrom(r.Context())
+		var name string
+		name, remote = RemoteCallerFrom(r.Context())
+		if name != "agent-x" {
+			t.Errorf("caller %q", name)
+		}
+	}))
+	for _, c := range []struct {
+		header string
+		status int
+	}{{"Bearer " + key, 200}, {"Bearer s", 401}, {"", 401}} {
+		r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+		r.Header.Set("Cf-Ray", "8f00")
+		r.Header.Set("X-Forwarded-For", "203.0.113.9")
+		if c.header != "" {
+			r.Header.Set("Authorization", c.header)
+		}
+		w := httptest.NewRecorder()
+		guard.ServeHTTP(w, r)
+		if w.Code != c.status {
+			t.Errorf("%q: status %d, want %d", c.header, w.Code, c.status)
+		}
+	}
+	if internal || !remote {
+		t.Errorf("internal %v remote %v, want only remote", internal, remote)
+	}
+}

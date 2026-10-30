@@ -7,9 +7,10 @@ leaving application routes, schema, copy, policy, and domain code in each app.
 The initial packages are:
 
 - `access`: bounded Cloudflare Access JWT verification, loopback-only local mode, and the bearer-key
-  guard for in-cluster internal routes.
+  guards for in-cluster internal routes (`Internal`) and for remote callers' bypassed paths (`Remote`).
 - `agentkit`: what an app's MCP tools at `/mcp` share (the `mcp-tools` skill): caller keys with
-  class ceilings behind `access.Internal`, references `<app>:<noun>/<id>`, idle-bounded runs, cut
+  class ceilings behind `access.Internal`, a second door for agents outside the cluster
+  (`GuardRemote`, ceiling at most prepare), references `<app>:<noun>/<id>`, idle-bounded runs, cut
   results and tool errors. Each app keeps its tools, write log and undo.
 - `appscaffold`: a one-time repository-local Docker/CI/Helm scaffold generator.
 - `httpx`: opt-in request IDs, strict bounded JSON decoding, an explicit JSON API 404, and the

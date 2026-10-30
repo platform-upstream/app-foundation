@@ -51,6 +51,63 @@ func InternalCallerFrom(ctx context.Context) (string, bool) {
 // policy deciding who may connect stays with the deployment; reject owns the response copy
 // (nil writes 401 with {"error":"Unauthorized."}).
 func Internal(keys map[string]string, reject RejectFunc) func(http.Handler) http.Handler {
+	match, reject := keyMatcher(keys), rejectOr401(reject)
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if Forwarded(r) {
+				reject(w, r, ErrForwarded)
+				return
+			}
+			matched := match(r)
+			if matched == "" {
+				reject(w, r, ErrInvalidKey)
+				return
+			}
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), internalCallerKey{}, matched)))
+		})
+	}
+}
+
+// Remote guards a route that callers outside the cluster reach through the tunnel, on a path the
+// deployment bypasses in Cloudflare Access (an agent on a hosted runner, which can send only a
+// static bearer key). The key check is Internal's; the ingress headers are allowed, so the key is
+// the only gate and keys passed here must be ones meant to leave the cluster. The matched name is
+// in the request context (RemoteCallerFrom), apart from Internal's, so a handler always knows
+// which door a caller came through.
+func Remote(keys map[string]string, reject RejectFunc) func(http.Handler) http.Handler {
+	match, reject := keyMatcher(keys), rejectOr401(reject)
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			matched := match(r)
+			if matched == "" {
+				reject(w, r, ErrInvalidKey)
+				return
+			}
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), remoteCallerKey{}, matched)))
+		})
+	}
+}
+
+type remoteCallerKey struct{}
+
+// RemoteCallerFrom returns the caller name Remote matched for this request.
+func RemoteCallerFrom(ctx context.Context) (string, bool) {
+	name, ok := ctx.Value(remoteCallerKey{}).(string)
+	return name, ok
+}
+
+// Forwarded reports whether the request carries a header the ingress, the tunnel or Access adds.
+func Forwarded(r *http.Request) bool {
+	for _, header := range forwardedHeaders {
+		if len(r.Header.Values(header)) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// keyMatcher returns the caller whose key the request's one bearer header carries, or "".
+func keyMatcher(keys map[string]string) func(*http.Request) string {
 	type entry struct {
 		name string
 		key  []byte
@@ -62,37 +119,29 @@ func Internal(keys map[string]string, reject RejectFunc) func(http.Handler) http
 		}
 	}
 	sort.Slice(callers, func(i, j int) bool { return callers[i].name < callers[j].name })
-	if reject == nil {
-		reject = func(w http.ResponseWriter, _ *http.Request, _ error) {
-			w.Header().Set("Content-Type", "application/json; charset=utf-8")
-			w.WriteHeader(http.StatusUnauthorized)
-			_ = json.NewEncoder(w).Encode(map[string]string{"error": "Unauthorized."})
+	return func(r *http.Request) string {
+		supplied, ok := bearer(r)
+		matched := ""
+		if ok {
+			// Every key is compared, so the time taken does not tell which caller nearly matched.
+			for _, caller := range callers {
+				if subtle.ConstantTimeCompare(supplied, caller.key) == 1 && matched == "" {
+					matched = caller.name
+				}
+			}
 		}
+		return matched
 	}
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			for _, header := range forwardedHeaders {
-				if len(r.Header.Values(header)) > 0 {
-					reject(w, r, ErrForwarded)
-					return
-				}
-			}
-			supplied, ok := bearer(r)
-			matched := ""
-			if ok {
-				// Every key is compared, so the time taken does not tell which caller nearly matched.
-				for _, caller := range callers {
-					if subtle.ConstantTimeCompare(supplied, caller.key) == 1 && matched == "" {
-						matched = caller.name
-					}
-				}
-			}
-			if matched == "" {
-				reject(w, r, ErrInvalidKey)
-				return
-			}
-			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), internalCallerKey{}, matched)))
-		})
+}
+
+func rejectOr401(reject RejectFunc) RejectFunc {
+	if reject != nil {
+		return reject
+	}
+	return func(w http.ResponseWriter, _ *http.Request, _ error) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Unauthorized."})
 	}
 }
 

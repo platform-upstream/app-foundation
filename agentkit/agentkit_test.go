@@ -114,3 +114,71 @@ func mustTime(t *testing.T) time.Time {
 	}
 	return at
 }
+
+func TestCheckRemote(t *testing.T) {
+	agent := strings.Repeat("a", 32)
+	if err := CheckRemote(map[string]string{"toolhive": key}, map[string]string{"agent-x": agent}, Callers{"toolhive": Edit, "agent-x": Prepare}); err != nil {
+		t.Fatal(err)
+	}
+	for name, tc := range map[string]struct {
+		keys, remote map[string]string
+		callers      Callers
+	}{
+		"remote above prepare":   {nil, map[string]string{"agent-x": agent}, Callers{"agent-x": Edit}},
+		"shared key":             {map[string]string{"toolhive": key}, map[string]string{"agent-x": key}, Callers{"toolhive": Edit, "agent-x": Read}},
+		"name on both doors":     {map[string]string{"agent-x": key}, map[string]string{"agent-x": agent}, Callers{"agent-x": Read}},
+		"remote without ceiling": {nil, map[string]string{"agent-x": agent}, Callers{}},
+	} {
+		if err := CheckRemote(tc.keys, tc.remote, tc.callers); err == nil {
+			t.Errorf("%s passed", name)
+		}
+	}
+}
+
+func TestGuardRemote(t *testing.T) {
+	agent := strings.Repeat("a", 32)
+	var caller string
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		caller = auth.TokenInfoFromContext(r.Context()).UserID
+	})
+	h := GuardRemote(map[string]string{"toolhive": key}, map[string]string{"agent-x": agent}, Callers{"toolhive": Edit, "agent-x": Prepare}, next)
+	for _, tc := range []struct {
+		key       string
+		forwarded bool
+		status    int
+		caller    string
+	}{
+		{key, false, 200, "toolhive"},
+		{agent, true, 200, "agent-x"},
+		// Each key opens only its own door: toolhive's is refused from outside, the agent's inside.
+		{key, true, 401, ""},
+		{agent, false, 401, ""},
+		{strings.Repeat("x", 32), true, 401, ""},
+	} {
+		caller = ""
+		r := httptest.NewRequest("POST", "/mcp", nil)
+		r.Header.Set("Authorization", "Bearer "+tc.key)
+		if tc.forwarded {
+			r.Header.Set("Cf-Ray", "8f00")
+			r.Header.Set("X-Forwarded-For", "203.0.113.9")
+		}
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != tc.status || caller != tc.caller {
+			t.Errorf("key %.4s forwarded %v: status %d caller %q, want %d %q", tc.key, tc.forwarded, w.Code, caller, tc.status, tc.caller)
+		}
+	}
+}
+
+func TestGuardRemoteRefusesARemoteCallerAbovePrepare(t *testing.T) {
+	agent := strings.Repeat("a", 32)
+	h := GuardRemote(nil, map[string]string{"agent-x": agent}, Callers{"agent-x": Edit}, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	r := httptest.NewRequest("POST", "/mcp", nil)
+	r.Header.Set("Authorization", "Bearer "+agent)
+	r.Header.Set("Cf-Ray", "8f00")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != 401 {
+		t.Fatalf("status %d, want 401", w.Code)
+	}
+}
