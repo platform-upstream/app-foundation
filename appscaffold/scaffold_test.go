@@ -180,7 +180,7 @@ func TestGenerateRejectsInvalidOptions(t *testing.T) {
 }
 
 // The generated Go application compiles, vets and passes its own tests against this checkout of
-// app-foundation (module cache only, no network). Skipped with -short.
+// app-foundation (public dependencies from the module proxy or cache). Skipped with -short.
 func TestGeneratedAppBuildsAndPassesItsTests(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds a generated application")
@@ -210,7 +210,7 @@ func TestGeneratedAppBuildsAndPassesItsTests(t *testing.T) {
 		t.Helper()
 		cmd := exec.Command(goBinary, args...)
 		cmd.Dir = target
-		cmd.Env = append(os.Environ(), "GOFLAGS=-mod=mod", "GOPROXY=off", "GOWORK=off")
+		cmd.Env = append(os.Environ(), "GOFLAGS=-mod=mod", "GOWORK=off")
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("go %s: %v\n%s", strings.Join(args, " "), err, out)
 		}
