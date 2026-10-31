@@ -1,0 +1,83 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          check-latest: true
+      - name: gofmt
+        run: test -z "$(gofmt -l $(git ls-files '*.go'))" || { gofmt -l $(git ls-files '*.go'); exit 1; }
+      - run: go vet ./...
+      # Includes TestGeneratedAppBuildsAndPassesItsTests: a scaffolded app vets and tests against this checkout.
+      - run: go test -race ./...
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  # The generated app the way CI on a platform builds it: frontend install, typecheck and build,
+  # then the app's own Dockerfile (registry check, gofmt, vet, tests, distroless image) and a
+  # read-only run of the image.
+  scaffold:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: app-foundation
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27"
+          check-latest: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "26"
+      - name: Generate an app
+        working-directory: app-foundation
+        run: |
+          cat > "$RUNNER_TEMP/platform.json" <<'JSON'
+          { "org": "acme-apps", "domain": "apps.example.org", "registry": "registry.example.org", "accessTeam": "acme.cloudflareaccess.com" }
+          JSON
+          go run ./cmd/app-scaffold -platform "$RUNNER_TEMP/platform.json" -target ../probe -name probe -title "Probe: CI" -foundation v1.0.0
+      - name: Vendor against this checkout
+        working-directory: probe
+        run: |
+          go mod edit -replace github.com/platform-upstream/app-foundation=../app-foundation
+          go mod tidy
+          go mod vendor
+      - name: Frontend
+        working-directory: probe/web
+        run: |
+          npm install -g "$(node -p 'require("./package.json").packageManager')"
+          pnpm install --frozen-lockfile
+          pnpm run typecheck
+          pnpm run build
+      - name: Docker build
+        working-directory: probe
+        # vendor/ holds the module; the replace path outside the build context is not read.
+        run: docker build -t probe:ci .
+      - name: Run the image read-only
+        run: |
+          docker run -d --name probe --read-only --tmpfs /tmp --tmpfs /data:uid=65532 -p 8080:8080 \
+            -e APP_ADDR=:8080 -e APP_DB=/data/probe.sqlite -e APP_ORIGIN=https://probe.apps.example.org \
+            -e CF_TEAM_DOMAIN=acme.cloudflareaccess.com -e CF_ACCESS_AUD=ci probe:ci
+          for i in $(seq 20); do curl -fs localhost:8080/healthz && break; sleep 1; done
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8080/pwa/manifest.webmanifest)" = 200
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8080/pwa/icon-180.png)" = 200
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8080/)" = 401
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8080/api/notes)" = 401
+          docker logs probe
