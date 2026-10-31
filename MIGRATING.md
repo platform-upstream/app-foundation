@@ -22,7 +22,8 @@ OpenTofu. Color did exactly this in castillo-platform/color fb0bd75.
 Windows: Go fetches the private module through git; give it gh as the credential helper:
 
 ```bash
-export GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=credential.helper GIT_CONFIG_VALUE_0= \n  GIT_CONFIG_KEY_1=credential.helper GIT_CONFIG_VALUE_1='!gh auth git-credential'
+export GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=credential.helper GIT_CONFIG_VALUE_0= \
+  GIT_CONFIG_KEY_1=credential.helper GIT_CONFIG_VALUE_1='!gh auth git-credential'
 ```
 
 `appscaffold.Options` needs a `Platform` (org, domain, registry, Access team); the CLI reads it
