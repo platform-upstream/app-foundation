@@ -5,7 +5,7 @@
       "description": "Same-origin JSON client with the standard error envelope and an injected auth-expiry hook."
     },
     "pwa": {
-      "description": "Service-worker registration and update lifecycle (onUpdate); the network-first service worker itself is installed by template and owned by the app."
+      "description": "Service-worker registration and update lifecycle (onUpdate); the service worker itself is installed by template (copy it on upgrade; app code goes in sw-app.js)."
     },
     "pwa-shell": {
       "description": "iOS-standalone-safe mobile shell: large-viewport height, keyboard handling, nav as the last flex child, published nav height."

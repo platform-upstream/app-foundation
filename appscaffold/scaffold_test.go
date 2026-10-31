@@ -68,7 +68,7 @@ func TestGenerateRendersCompleteApp(t *testing.T) {
 		"web/index.html":                      {`<html lang="de">`, `<title>Field Notes: Familie</title>`, `content="Field Notes: Familie" />`, `href="/pwa/icon-180.png"`},
 		"web/public/pwa/manifest.webmanifest": {`"name": "Field Notes: Familie"`, `"lang": "de"`},
 		"web/package.json":                    {`"name": "field-notes-web"`},
-		"web/public/sw.js":                    {`'field-notes-shell:'`},
+		"web/src/main.tsx":                    {`registerServiceWorker({ name: 'field-notes' });`},
 		"web/vite.config.ts":                  {"port: 5250", "'http://127.0.0.1:8150'"},
 		"web/src/App.tsx":                     {"NotesPage"},
 		"web/public/pwa/icon.svg":             {`fill="#2f6fde"`},
@@ -110,6 +110,14 @@ func TestGenerateRendersCompleteApp(t *testing.T) {
 	differences, err := registry.Check(filepath.Join(target, "web"), "api", "pwa", "pwa-shell")
 	if err != nil || len(differences) != 0 {
 		t.Fatalf("registry check: %v %v", differences, err)
+	}
+	// The service worker is the template's copy, unpersonalized, so an upgrade is a plain copy.
+	worker, err := os.ReadFile(filepath.Join("..", "frontendregistry", "sources", "pwa", "sw.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if read(t, target, "web/public/sw.js") != string(worker) {
+		t.Fatal("web/public/sw.js differs from the registry's sw.js")
 	}
 }
 

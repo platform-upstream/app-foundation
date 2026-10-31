@@ -301,8 +301,9 @@ func personalize(tree *sourcetree.Tree, o Options) error {
 		"web/package.json": {
 			{`"name": "foundation-react-app"`, `"name": "` + o.Name + `-web"`},
 		},
-		"web/public/sw.js": {
-			{`'foundation-shell:'`, `'` + o.Name + `-shell:'`},
+		// The service worker stays the template's copy; the registration names its cache.
+		"web/src/main.tsx": {
+			{`registerServiceWorker();`, `registerServiceWorker({ name: '` + o.Name + `' });`},
 		},
 		"web/vite.config.ts": {
 			{"  build: { outDir: 'dist', emptyOutDir: true },\n", "  build: { outDir: 'dist', emptyOutDir: true },\n" +

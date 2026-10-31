@@ -2,6 +2,7 @@ package frontendregistry
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -195,5 +196,18 @@ func TestShellViewportByStatusBarAndNoContainingBlock(t *testing.T) {
 		if regexp.MustCompile(`(^|[;{\s])` + property + `\s*:`).MatchString(keyboard) {
 			t.Fatalf("keyboard rule sets %s (containing-block trap)", property)
 		}
+	}
+}
+
+// The template service worker caches only the shell and /assets/, honours no-store/private, names
+// its cache from ?name= and loads sw-app.js (testdata/sw_test.mjs). Needs Node; skipped without.
+func TestServiceWorker(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node not on PATH")
+	}
+	out, err := exec.Command(node, filepath.Join("testdata", "sw_test.mjs"), filepath.Join("sources", "pwa", "sw.js")).CombinedOutput()
+	if err != nil {
+		t.Fatalf("sw.js: %v\n%s", err, out)
 	}
 }

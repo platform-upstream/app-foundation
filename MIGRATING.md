@@ -1,3 +1,15 @@
+# Migrating to v1.1.0
+
+v1.1.0 is backwards compatible: bump the pin, `go mod tidy && go mod vendor`, then
+`go tool frontend-registry sync -target web -modules api,pwa,pwa-shell` and review the diff.
+
+Service worker (template-owned, not covered by `check`): copy the new
+`frontendregistry/sources/pwa/sw.js` over `web/public/sw.js` and keep your additions in
+`web/public/sw-app.js`, which the worker loads when it exists (a fetch listener there that answers
+a request calls `event.stopImmediatePropagation()`). The new worker caches only the shell and
+`/assets/`, skips `/pwa/`, and drops the older caches of its scope on activation. Pass the app name
+to `registerServiceWorker({ name: '<app>' })` in `src/main.tsx` to name the cache.
+
 # Migrating to v1.0.0 (platform-upstream)
 
 v1.0.0 is the first release under the neutral module path. It contains everything of

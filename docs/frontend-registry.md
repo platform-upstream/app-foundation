@@ -42,15 +42,20 @@ are a starting point, not a shared theme.
   resolves the default API base from the origin rather than the current SPA route, exposes status
   through `APIError`, uses manual redirects so Cloudflare Access expiry is visible, and leaves the
   exact auth-expiry predicate/action and user-facing fallback copy injectable.
-- `pwa` installs the update lifecycle proven by Read. `template` installs a starting network-first
-  service worker (`public/sw.js`) that the application owns from then on (every app adapts it:
-  asset allowlists, push, cache names), so `check` does not cover it. The starting worker never
-  handles or caches `/api/`, `/internal/`, or `/cdn-cgi/`; it does not cache redirects; and ordinary
-  offline navigations may fall back to the cached shell. A page that stays open, such as an installed
+- `pwa` installs the update lifecycle proven by Read. `template` installs the service worker
+  (`public/sw.js`). It is template-owned and `check` does not cover it: after a release that changes
+  it, copy the new file over; the app's own worker code (push, notifications, share target, extra
+  cache rules) lives in `public/sw-app.js`, which the worker loads with `importScripts` when it
+  exists. A fetch listener there that answers a request calls `event.stopImmediatePropagation()`.
+  The worker caches only navigations (one shell entry, network first, the shell only when the
+  network fails) and `/assets/` files (cache first, at most 64); it never handles `/api/`,
+  `/internal/`, `/cdn-cgi/` or `/pwa/`, never stores redirects or `private` responses, and stores
+  `no-store` responses only as the shell (web.Handler serves documents `no-store`).
+  `registerServiceWorker({ name })` registers `sw.js?name=<app>`, which names the cache. A page that stays open, such as an installed
   app that is resumed rather than relaunched, checks for a newer build on load and whenever it
   becomes visible, and reloads into it. `onUpdate(apply)` hands that decision to the application:
-  ask the user, or wait until nothing would be interrupted (Listen never reloads during playback). Cache names are isolated by service-worker
-  scope. Push, share-target, notification, and background-sync behavior remains app-owned.
+  ask the user, or wait until nothing would be interrupted (Listen never reloads during playback). Cache names are isolated by
+  service-worker scope. Push, share-target, notification, and background-sync behavior remains app-owned.
 - `pwa-shell` is the mobile shell proven by Omni in iOS standalone PWAs: `shell.css` (in
   `@layer foundation`; import it before the app's CSS) keeps the shell in normal flow at `100dvh`,
   or `100lvh` in a standalone app when `index.html` sets the `black-translucent` status bar (only

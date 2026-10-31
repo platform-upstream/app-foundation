@@ -8,6 +8,9 @@ export type ServiceWorkerUpdates = {
   reload?: () => void;
   // Where the application is served; only a path-prefixed preview needs anything but the root.
   base?: string;
+  // The app's name (a DNS label) for the service worker's cache name: registers sw.js?name=<name>.
+  // Without it the worker names its cache after the scope.
+  name?: string;
 };
 
 export function registerServiceWorker(options: ServiceWorkerUpdates = {}): () => void {
@@ -24,6 +27,7 @@ export function registerServiceWorker(options: ServiceWorkerUpdates = {}): () =>
   const origin = location.origin;
   const root = new URL(options.base ?? '/', origin);
   const scriptURL = new URL('sw.js', root);
+  if (options.name) scriptURL.searchParams.set('name', options.name);
   const bootModule = import.meta.url;
 
   const update = async () => {

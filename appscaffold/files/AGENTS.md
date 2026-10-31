@@ -39,7 +39,8 @@ working example of the whole round trip: replace it with the app's own, keep the
   and scroll to it instead.
 - Status bar: `default` in `index.html`. `black-translucent` only with a dark top bar (white text).
 - Only a real iPhone confirms the shell. Emulation: Playwright WebKit at 402×874.
-- `public/sw.js` is app-owned: add cache rules there (never cache `/api/` responses blindly).
+- `public/sw.js` is the template's copy (replace it when app-foundation changes it); the app's own
+  worker code (push, notifications, cache rules) goes in `public/sw-app.js`, which it loads.
 
 ## Local preview
 
