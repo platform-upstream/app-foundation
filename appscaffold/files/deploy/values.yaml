@@ -14,6 +14,15 @@ cfAccessAud: ""
 # Client IDs of Access service tokens accepted besides people, comma-separated (agent-verify).
 cfAccessServiceTokens: ""
 
+# directory's identity API: who a signed-in person is and their role in this app. Platform values,
+# set them in the apps-production wrapper. The Secret (created by the platform, such as an
+# ExternalSecret) holds this app's key under directory-key; directory lists the app in its
+# `callers` and its namespace in `networkPolicy.callerNamespaces`.
+directory:
+  # http://directory.<namespace>.svc:8080
+  url: ""
+  existingSecret: ""
+
 ingress:
   className: traefik
 

@@ -1,3 +1,24 @@
+# Migrating to v1.2.0
+
+v1.2.0 is backwards compatible (bump, `go mod tidy && go mod vendor`). New:
+
+- `identity`: the directory person behind a request. Adopt it per app, when the app moves to
+  directory people (principles: tenancy = person within a platform):
+  1. directory: add the app to `callers` (key `caller-<app>-key`) and its namespace to
+     `networkPolicy.callerNamespaces`; grant the people in the directory UI.
+  2. App chart: `DIRECTORY_URL` (directory's in-cluster URL) and `DIRECTORY_KEY` (the same key,
+     from the app's own secret). The scaffold's chart shows it (`directory.url`,
+     `directory.existingSecret`, key `directory-key`).
+  3. Code: `identity.ConfigFromEnv` → `identity.NewClient` → `identity.NewCache`, then
+     `identity.Middleware(cache, opts)` inside `auth.Middleware` on the API. Local mode passes a
+     nil resolver and `Options.Local`. Service tokens that act for someone go in
+     `Options.ServiceTokens`.
+  4. Data: key it by `identity.From(ctx).ID`; migrate old user ids to directory ids once.
+  Tests use `identitytest.New(people...)` or `identity.NewContext`.
+- `access.NewContext` puts a Caller into a context (tests of handlers behind access).
+- Scaffold: notes are owned by the calling person, viewers read only, the chart requires the
+  directory values, and AGENTS.md has the Tenancy section.
+
 # Migrating to v1.1.0
 
 v1.1.0 is backwards compatible: bump the pin, `go mod tidy && go mod vendor`, then

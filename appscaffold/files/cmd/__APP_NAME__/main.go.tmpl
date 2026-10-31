@@ -12,6 +12,7 @@ import (
 
 	"github.com/platform-upstream/app-foundation/access"
 	"github.com/platform-upstream/app-foundation/httpx"
+	"github.com/platform-upstream/app-foundation/identity"
 	"github.com/platform-upstream/app-foundation/server"
 	"github.com/platform-upstream/app-foundation/web"
 
@@ -43,6 +44,10 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	people, err := newPeople(authConfig.Mode)
+	if err != nil {
+		return err
+	}
 	st, err := store.Open(ctx, env("APP_DB", ".local/__APP_NAME__.sqlite"))
 	if err != nil {
 		return err
@@ -52,7 +57,7 @@ func run() error {
 			slog.Error("close database", "error", err)
 		}
 	}()
-	handler, err := newHandler(st, auth, os.Getenv("APP_ORIGIN"))
+	handler, err := newHandler(st, auth, people, os.Getenv("APP_ORIGIN"))
 	if err != nil {
 		return err
 	}
@@ -60,11 +65,34 @@ func run() error {
 	return server.Run(ctx, server.New(addr, handler))
 }
 
+// people says who a request is: in production directory's identity API (DIRECTORY_URL,
+// DIRECTORY_KEY, set by the chart) behind a cache; in the local preview a fixed owner, because
+// directory is not reachable from a workstation.
+type people struct {
+	resolver identity.Resolver
+	options  identity.Options
+}
+
+func newPeople(mode access.Mode) (people, error) {
+	if mode == access.ModeLocal {
+		return people{options: identity.Options{Local: &identity.Person{ID: "local", Name: "Local preview", Role: "owner"}}}, nil
+	}
+	cfg, err := identity.ConfigFromEnv()
+	if err != nil {
+		return people{}, err
+	}
+	client, err := identity.NewClient(cfg)
+	if err != nil {
+		return people{}, err
+	}
+	return people{resolver: identity.NewCache(client, identity.CacheOptions{})}, nil
+}
+
 // newHandler composes the routes in the foundation's order: security headers, the public shallow
 // /healthz (liveness) and /readyz (readiness: the database answers), the public /pwa/ files
 // (manifest and icons, see web.PublicPrefix), then Cloudflare Access for everything else, static
-// files included.
-func newHandler(st *store.Store, auth *access.Authenticator, origin string) (http.Handler, error) {
+// files included. The API also needs a directory person (identity.Middleware).
+func newHandler(st *store.Store, auth *access.Authenticator, who people, origin string) (http.Handler, error) {
 	if auth == nil {
 		return nil, errors.New("authenticator is required")
 	}
@@ -73,7 +101,18 @@ func newHandler(st *store.Store, auth *access.Authenticator, origin string) (htt
 		return nil, err
 	}
 	protected := http.NewServeMux()
-	protected.Handle("/api/", api.New(st, origin).Routes())
+	who.options.Reject = func(w http.ResponseWriter, _ *http.Request, err error) {
+		switch {
+		case errors.Is(err, identity.ErrUnknown), errors.Is(err, identity.ErrActFor):
+			_ = httpx.WriteError(w, http.StatusForbidden, "This account has no access to this app.")
+		case errors.Is(err, identity.ErrNoCaller):
+			_ = httpx.WriteError(w, http.StatusUnauthorized, "Please sign in again.")
+		default:
+			slog.Warn("identity unavailable", "error", err)
+			_ = httpx.WriteError(w, http.StatusServiceUnavailable, "Sign-in is unavailable right now. Try again shortly.")
+		}
+	}
+	protected.Handle("/api/", identity.Middleware(who.resolver, who.options)(api.New(st, origin).Routes()))
 	protected.Handle("/", spa)
 	gated := auth.Middleware(func(w http.ResponseWriter, _ *http.Request, _ error) {
 		_ = httpx.WriteError(w, http.StatusUnauthorized, "Please sign in again.")

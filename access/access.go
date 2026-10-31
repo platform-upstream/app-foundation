@@ -119,6 +119,12 @@ func (c Caller) Person() bool { return c.Subject != "" }
 
 type callerKey struct{}
 
+// NewContext returns ctx carrying caller, as Middleware does after verifying a request. Use it in
+// tests of handlers behind Middleware; production requests get their Caller only from Middleware.
+func NewContext(ctx context.Context, caller Caller) context.Context {
+	return context.WithValue(ctx, callerKey{}, caller)
+}
+
 // CallerFrom returns the caller the Middleware verified for this request.
 func CallerFrom(ctx context.Context) (Caller, bool) {
 	caller, ok := ctx.Value(callerKey{}).(Caller)
@@ -192,7 +198,7 @@ func (a *Authenticator) Middleware(reject RejectFunc) func(http.Handler) http.Ha
 				reject(w, r, err)
 				return
 			}
-			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), callerKey{}, caller)))
+			next.ServeHTTP(w, r.WithContext(NewContext(r.Context(), caller)))
 		})
 	}
 }

@@ -48,6 +48,13 @@ spec:
               value: {{ required "cfAccessAud is required (tofu output -json app_auds)" .Values.cfAccessAud | quote }}
             - name: CF_ACCESS_SERVICE_TOKENS
               value: {{ .Values.cfAccessServiceTokens | quote }}
+            - name: DIRECTORY_URL
+              value: {{ required "directory.url is required (directory's in-cluster URL, apps-production wrapper)" .Values.directory.url | quote }}
+            - name: DIRECTORY_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "directory.existingSecret is required (Secret with this app's identity API key under directory-key)" .Values.directory.existingSecret | quote }}
+                  key: directory-key
             - name: GOMEMLIMIT
               value: {{ .Values.runtime.goMemLimit | quote }}
             - name: GOMAXPROCS

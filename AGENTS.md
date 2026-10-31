@@ -3,6 +3,7 @@
 Small Go primitives for the platforms' first-party apps; a toolkit, not a framework. Usage: `go doc <pkg>` (examples in `example_test.go`).
 
 - `access`: Cloudflare Access JWT, fail-closed local mode, `ConfigFromEnv`, bearer guards `Internal`/`Remote`.
+- `identity`: Access caller → directory person (role, actsFor), cached with stale-if-error, `Middleware` after access, fail closed; fake `identitytest`.
 - `agentkit`: shared parts of an app's MCP tools (caller ceilings, references, runs, cut results).
 - `httpx`: request IDs, bounded JSON decoding, `{"error":"..."}` envelope, API 404.
 - `server`: bounded `http.Server`, `Health` (/healthz), `Ready` (/readyz), graceful shutdown.
@@ -10,7 +11,7 @@ Small Go primitives for the platforms' first-party apps; a toolkit, not a framew
 - `web`: embedded SPA with cache rules, `PublicFiles` for /pwa/, security `Headers`.
 - `llm`, `memory`, `push`: clients; `frontendregistry`: frontend source installer; `appscaffold`: app generator.
 
-Composition, outermost first: `web.Headers` → probes → `access.Internal` routes → `web.PublicFiles(spa, gated)` → Access → `/api/`, SPA.
+Composition, outermost first: `web.Headers` → probes → `access.Internal` routes → `web.PublicFiles(spa, gated)` → Access → `identity` (on `/api/`) → `/api/`, SPA.
 
 Rules: no platform names (org, domain, Access team, registry, secret path; examples use example.org,
 acme); extract only what a consumer proved; no app object, router, ORM, DI; schemas, CSP, policy and copy

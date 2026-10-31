@@ -8,6 +8,9 @@ The initial packages are:
 
 - `access`: bounded Cloudflare Access JWT verification, loopback-only local mode, `ConfigFromEnv`, and the bearer-key
   guards for in-cluster internal routes (`Internal`) and for remote callers' bypassed paths (`Remote`).
+- `identity`: who a signed-in caller is: the directory person (id, name, photo, role in this app,
+  the kid profiles they act for) from directory's in-cluster identity API, cached with
+  stale-if-error, as `Middleware` after access that fails closed; `identitytest` fakes directory.
 - `agentkit`: what an app's MCP tools at `/mcp` share (the `mcp-tools` skill): caller keys with
   class ceilings behind `access.Internal`, a second door for agents outside the cluster
   (`GuardRemote`, ceiling at most prepare), references `<app>:<noun>/<id>`, idle-bounded runs, cut
@@ -63,13 +66,24 @@ go to `Ready`, which never names the failing check in its response. Keep readine
 database ping): a shared dependency that fails would take every pod out of the service at once.
 Checks passed to `Health` are ignored (v0.1 call shape, deprecated).
 
-**Access.** It is an owner gate, so there is no shared identity model: the middleware only puts a
-`Caller` into the context, for the few routes that must refuse service tokens. Everything fails
+**Access.** It proves the login and nothing more: the middleware puts a `Caller` (subject, e-mail
+or service token) into the context; who that is and what they may do is `identity`'s job. Everything fails
 closed: missing configuration is a startup error, and local mode requires the literal `127.0.0.1`
 listener and a loopback peer per request. Internal routes refuse anything that passed the ingress,
 tunnel or Access, so the public hostname never reaches them. Mutation origin checks accept a missing
 `Origin` unless `Sec-Fetch-Site` says `cross-site`, matching the proven Read and Cook behaviour.
 Authorization policy, the callers that exist, their NetworkPolicies and rejection copy stay in apps.
+
+**Identity.** Tenancy is a person within a platform, and who a person is comes from directory,
+never from an app's own user list. `identity.Middleware` runs after access on the API: a person
+signs in through Access (e-mail), service tokens act for a person named in `Options.ServiceTokens`,
+local mode acts as `Options.Local`; everyone else, anyone directory does not grant this app, and
+any request while directory cannot answer is refused. Apps key data by `Person.ID` and filter every
+query by `identity.From`. Kids have no login: an adult sends `X-Act-For: <kid id>`, accepted only
+for ids in `Person.ActsFor` that directory reports as kids; `From` is then the kid, `ActorFrom`
+the adult. `Cache` keeps a person fresh for a minute (a removed grant takes effect within it),
+serves a known person up to an hour longer while directory is unavailable (never an unknown one),
+and shares concurrent lookups. Roles beyond owner/member/viewer and what they allow stay in apps.
 
 **SQLite.** One open connection, WAL, a busy timeout, and `BEGIN IMMEDIATE` transactions: old and new
 pod share the file during a rolling update, and a deferred transaction that reads, sees the other
@@ -103,7 +117,7 @@ Developers and release automation that resolve the private module need GitHub au
 
 ```bash
 go env -w GOPRIVATE=github.com/platform-upstream/*
-go get github.com/platform-upstream/app-foundation@v1.1.0
+go get github.com/platform-upstream/app-foundation@v1.2.0
 ```
 
 Consumers should pin an exact release. For container builds, resolve the module outside the image

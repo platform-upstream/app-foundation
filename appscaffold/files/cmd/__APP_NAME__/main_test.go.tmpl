@@ -65,7 +65,11 @@ func testHandler(t *testing.T) http.Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler, err := newHandler(st, auth, "https://__APP_HOST__")
+	who, err := newPeople(access.ModeLocal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler, err := newHandler(st, auth, who, "https://__APP_HOST__")
 	if err != nil {
 		t.Fatal(err)
 	}

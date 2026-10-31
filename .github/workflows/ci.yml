@@ -68,10 +68,13 @@ jobs:
         working-directory: probe
         run: |
           if grep -r acme.cloudflareaccess.com deploy; then echo "platform value in the chart"; exit 1; fi
-          if helm template probe deploy --set cfAccessAud=ci > /dev/null; then echo "rendered without cfTeamDomain"; exit 1; fi
-          helm template probe deploy --set cfAccessAud=ci --set cfTeamDomain=acme.cloudflareaccess.com > "$RUNNER_TEMP/chart.yaml"
+          dir="--set directory.url=http://directory.directory.svc:8080 --set directory.existingSecret=probe-directory"
+          if helm template probe deploy --set cfAccessAud=ci $dir > /dev/null; then echo "rendered without cfTeamDomain"; exit 1; fi
+          if helm template probe deploy --set cfAccessAud=ci --set cfTeamDomain=acme.cloudflareaccess.com > /dev/null; then echo "rendered without directory"; exit 1; fi
+          helm template probe deploy --set cfAccessAud=ci --set cfTeamDomain=acme.cloudflareaccess.com $dir > "$RUNNER_TEMP/chart.yaml"
           grep -q 'path: /readyz' "$RUNNER_TEMP/chart.yaml"
           grep -q 'value: "acme.cloudflareaccess.com"' "$RUNNER_TEMP/chart.yaml"
+          grep -q 'name: "probe-directory"' "$RUNNER_TEMP/chart.yaml"
       - name: Vendor against this checkout
         working-directory: probe
         run: |
@@ -93,7 +96,8 @@ jobs:
         run: |
           docker run -d --name probe --read-only --tmpfs /tmp --tmpfs /data:uid=65532 -p 8080:8080 \
             -e APP_ADDR=:8080 -e APP_DB=/data/probe.sqlite -e APP_ORIGIN=https://probe.apps.example.org \
-            -e CF_TEAM_DOMAIN=acme.cloudflareaccess.com -e CF_ACCESS_AUD=ci probe:ci
+            -e CF_TEAM_DOMAIN=acme.cloudflareaccess.com -e CF_ACCESS_AUD=ci \
+            -e DIRECTORY_URL=http://directory.invalid:8080 -e DIRECTORY_KEY=ci-key-ci-key-ci-key-ci-key-ci-key-1 probe:ci
           for i in $(seq 20); do curl -fs localhost:8080/healthz && break; sleep 1; done
           curl -fs localhost:8080/readyz
           test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8080/pwa/manifest.webmanifest)" = 200

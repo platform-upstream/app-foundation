@@ -17,7 +17,8 @@ import (
 // ErrNotFound reports a missing row.
 var ErrNotFound = errors.New("not found")
 
-// Note is the example record of the scaffold: replace it with the app's own data.
+// Note is the example record of the scaffold: replace it with the app's own data. Each note belongs
+// to one person (directory id); every query takes the person and filters by it.
 type Note struct {
 	ID        int64     `json:"id"`
 	Text      string    `json:"text"`
@@ -50,9 +51,9 @@ func (s *Store) Close() error { return s.db.Close() }
 // Ping reports whether the database answers; it backs the readiness probe (/readyz).
 func (s *Store) Ping(ctx context.Context) error { return s.db.PingContext(ctx) }
 
-// Notes returns all notes, newest first.
-func (s *Store) Notes(ctx context.Context) ([]Note, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id, text, created_at FROM notes ORDER BY id DESC`)
+// Notes returns the person's notes, newest first.
+func (s *Store) Notes(ctx context.Context, personID string) ([]Note, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id, text, created_at FROM notes WHERE person_id = ? ORDER BY id DESC`, personID)
 	if err != nil {
 		return nil, err
 	}
@@ -70,10 +71,13 @@ func (s *Store) Notes(ctx context.Context) ([]Note, error) {
 	return notes, rows.Err()
 }
 
-// AddNote stores a note and returns it.
-func (s *Store) AddNote(ctx context.Context, text string) (Note, error) {
+// AddNote stores a note of the person and returns it.
+func (s *Store) AddNote(ctx context.Context, personID, text string) (Note, error) {
+	if personID == "" {
+		return Note{}, errors.New("a note needs a person")
+	}
 	created := s.now().UTC().Truncate(time.Millisecond)
-	result, err := s.db.ExecContext(ctx, `INSERT INTO notes (text, created_at) VALUES (?, ?)`, text, created.UnixMilli())
+	result, err := s.db.ExecContext(ctx, `INSERT INTO notes (person_id, text, created_at) VALUES (?, ?, ?)`, personID, text, created.UnixMilli())
 	if err != nil {
 		return Note{}, err
 	}
@@ -84,9 +88,10 @@ func (s *Store) AddNote(ctx context.Context, text string) (Note, error) {
 	return Note{ID: id, Text: text, CreatedAt: created}, nil
 }
 
-// DeleteNote removes a note; ErrNotFound when it does not exist.
-func (s *Store) DeleteNote(ctx context.Context, id int64) error {
-	result, err := s.db.ExecContext(ctx, `DELETE FROM notes WHERE id = ?`, id)
+// DeleteNote removes one of the person's notes; ErrNotFound when the person has no such note
+// (another person's note included).
+func (s *Store) DeleteNote(ctx context.Context, personID string, id int64) error {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM notes WHERE id = ? AND person_id = ?`, id, personID)
 	if err != nil {
 		return err
 	}

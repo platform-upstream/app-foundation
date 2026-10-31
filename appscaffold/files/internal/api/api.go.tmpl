@@ -1,5 +1,8 @@
 // Package api holds the HTTP handlers. Handlers stay thin: decoding and validation here, SQL in
 // store. The scaffold's notes are an example; replace them with the app's own routes.
+//
+// Every handler works on the data of identity.From: the signed-in directory person, or the kid
+// they act for. Routes run behind identity.Middleware, which refuses anyone else.
 package api
 
 import (
@@ -11,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/platform-upstream/app-foundation/httpx"
+	"github.com/platform-upstream/app-foundation/identity"
 
 	"__MODULE__/internal/store"
 )
@@ -36,8 +40,33 @@ func (a *API) Routes() http.Handler {
 	return httpx.SameOrigin([]string{a.origin}, nil)(mux)
 }
 
+// person returns whose data the request reads and writes. Without one (a route mounted outside
+// identity.Middleware) it answers 401.
+func person(w http.ResponseWriter, r *http.Request) (identity.Person, bool) {
+	p, ok := identity.From(r.Context())
+	if !ok || p.ID == "" {
+		_ = httpx.WriteError(w, http.StatusUnauthorized, "Please sign in again.")
+		return identity.Person{}, false
+	}
+	return p, true
+}
+
+// writer is person for changes: the app's viewers read only.
+func writer(w http.ResponseWriter, r *http.Request) (identity.Person, bool) {
+	p, ok := person(w, r)
+	if ok && p.Role == "viewer" {
+		_ = httpx.WriteError(w, http.StatusForbidden, "You can only read here.")
+		return identity.Person{}, false
+	}
+	return p, ok
+}
+
 func (a *API) notes(w http.ResponseWriter, r *http.Request) {
-	notes, err := a.store.Notes(r.Context())
+	p, ok := person(w, r)
+	if !ok {
+		return
+	}
+	notes, err := a.store.Notes(r.Context(), p.ID)
 	if err != nil {
 		internal(w, r, err)
 		return
@@ -46,6 +75,10 @@ func (a *API) notes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) addNote(w http.ResponseWriter, r *http.Request) {
+	p, ok := writer(w, r)
+	if !ok {
+		return
+	}
 	var body struct {
 		Text string `json:"text"`
 	}
@@ -58,7 +91,7 @@ func (a *API) addNote(w http.ResponseWriter, r *http.Request) {
 		_ = httpx.WriteError(w, http.StatusBadRequest, "A note needs 1 to 500 characters.")
 		return
 	}
-	note, err := a.store.AddNote(r.Context(), text)
+	note, err := a.store.AddNote(r.Context(), p.ID, text)
 	if err != nil {
 		internal(w, r, err)
 		return
@@ -67,12 +100,16 @@ func (a *API) addNote(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) deleteNote(w http.ResponseWriter, r *http.Request) {
+	p, ok := writer(w, r)
+	if !ok {
+		return
+	}
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id <= 0 {
 		_ = httpx.WriteError(w, http.StatusNotFound, "Not found.")
 		return
 	}
-	switch err := a.store.DeleteNote(r.Context(), id); {
+	switch err := a.store.DeleteNote(r.Context(), p.ID, id); {
 	case errors.Is(err, store.ErrNotFound):
 		_ = httpx.WriteError(w, http.StatusNotFound, "Not found.")
 	case err != nil:

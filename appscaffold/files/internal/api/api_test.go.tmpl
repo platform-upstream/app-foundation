@@ -8,7 +8,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/platform-upstream/app-foundation/identity"
+
 	"__MODULE__/internal/store"
+)
+
+var (
+	alice = identity.Person{ID: "alice", Name: "Alice", Role: "owner"}
+	bob   = identity.Person{ID: "bob", Name: "Bob", Role: "member"}
+	vera  = identity.Person{ID: "vera", Name: "Vera", Role: "viewer"}
 )
 
 func TestNotesAPI(t *testing.T) {
@@ -19,8 +27,12 @@ func TestNotesAPI(t *testing.T) {
 	defer st.Close()
 	h := New(st, "https://__APP_HOST__").Routes()
 
-	do := func(method, path, body string, headers map[string]string) *httptest.ResponseRecorder {
+	// as runs a request for p, as identity.Middleware would hand it over.
+	as := func(p *identity.Person, method, path, body string, headers map[string]string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(method, path, strings.NewReader(body))
+		if p != nil {
+			req = req.WithContext(identity.NewContext(req.Context(), *p, *p))
+		}
 		if body != "" {
 			req.Header.Set("Content-Type", "application/json")
 		}
@@ -32,25 +44,39 @@ func TestNotesAPI(t *testing.T) {
 		return rec
 	}
 
-	if rec := do(http.MethodPost, "/api/notes", `{"text":"  hello  "}`, nil); rec.Code != http.StatusCreated || !strings.Contains(rec.Body.String(), `"text":"hello"`) {
+	if rec := as(&alice, http.MethodPost, "/api/notes", `{"text":"  hello  "}`, nil); rec.Code != http.StatusCreated || !strings.Contains(rec.Body.String(), `"text":"hello"`) {
 		t.Fatalf("create: %d %s", rec.Code, rec.Body)
 	}
-	if rec := do(http.MethodPost, "/api/notes", `{"text":" "}`, nil); rec.Code != http.StatusBadRequest {
+	if rec := as(&alice, http.MethodPost, "/api/notes", `{"text":" "}`, nil); rec.Code != http.StatusBadRequest {
 		t.Fatalf("empty note: %d", rec.Code)
 	}
-	if rec := do(http.MethodPost, "/api/notes", `{"text":"x"}`, map[string]string{"Origin": "https://evil.example"}); rec.Code != http.StatusForbidden {
+	if rec := as(&alice, http.MethodPost, "/api/notes", `{"text":"x"}`, map[string]string{"Origin": "https://evil.example"}); rec.Code != http.StatusForbidden {
 		t.Fatalf("cross-site create: %d", rec.Code)
 	}
-	if rec := do(http.MethodGet, "/api/notes", "", nil); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "hello") {
+	if rec := as(&alice, http.MethodGet, "/api/notes", "", nil); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "hello") {
 		t.Fatalf("list: %d %s", rec.Code, rec.Body)
 	}
-	if rec := do(http.MethodDelete, "/api/notes/1", "", nil); rec.Code != http.StatusNoContent {
+	// Notes belong to their person: bob sees none of alice's and cannot delete them.
+	if rec := as(&bob, http.MethodGet, "/api/notes", "", nil); rec.Code != http.StatusOK || strings.TrimSpace(rec.Body.String()) != "[]" {
+		t.Fatalf("bob's list: %d %q", rec.Code, rec.Body)
+	}
+	if rec := as(&bob, http.MethodDelete, "/api/notes/1", "", nil); rec.Code != http.StatusNotFound {
+		t.Fatalf("bob deletes alice's note: %d", rec.Code)
+	}
+	// Viewers read only; a request without a person is refused.
+	if rec := as(&vera, http.MethodPost, "/api/notes", `{"text":"x"}`, nil); rec.Code != http.StatusForbidden {
+		t.Fatalf("viewer writes: %d", rec.Code)
+	}
+	if rec := as(nil, http.MethodGet, "/api/notes", "", nil); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("no person: %d", rec.Code)
+	}
+	if rec := as(&alice, http.MethodDelete, "/api/notes/1", "", nil); rec.Code != http.StatusNoContent {
 		t.Fatalf("delete: %d", rec.Code)
 	}
-	if rec := do(http.MethodDelete, "/api/notes/1", "", nil); rec.Code != http.StatusNotFound {
+	if rec := as(&alice, http.MethodDelete, "/api/notes/1", "", nil); rec.Code != http.StatusNotFound {
 		t.Fatalf("delete again: %d", rec.Code)
 	}
-	if rec := do(http.MethodGet, "/api/unknown", "", nil); rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), `"error"`) {
+	if rec := as(&alice, http.MethodGet, "/api/unknown", "", nil); rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), `"error"`) {
 		t.Fatalf("unknown route: %d %s", rec.Code, rec.Body)
 	}
 }

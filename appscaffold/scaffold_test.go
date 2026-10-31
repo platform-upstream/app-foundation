@@ -58,13 +58,13 @@ func TestGenerateRendersCompleteApp(t *testing.T) {
 
 	for name, want := range map[string][]string{
 		"go.mod":                              {"module github.com/acme-apps/field-notes", "app-foundation v1.0.0", "go 1.27.0"},
-		"cmd/field-notes/main.go":             {`"github.com/acme-apps/field-notes/internal/api"`, `"127.0.0.1:8150"`},
+		"cmd/field-notes/main.go":             {`"github.com/acme-apps/field-notes/internal/api"`, `"127.0.0.1:8150"`, "identity.Middleware(who.resolver, who.options)"},
 		"deploy/values.yaml":                  {"repository: registry.example.org/acme-apps/field-notes", "hostname: field-notes.apps.example.org", `cfTeamDomain: ""`},
 		"deploy/templates/deployment.yaml":    {`required "cfTeamDomain is required`, "path: /readyz", "path: /healthz"},
 		"deploy/Chart.yaml":                   {"name: field-notes"},
 		"Dockerfile":                          {"./cmd/field-notes", "static-debian13:nonroot"},
 		".ci/pipeline.yaml":                   {"name: field-notes"},
-		"AGENTS.md":                           {"https://field-notes.apps.example.org", "Vite on 127.0.0.1:5250", "cfTeamDomain: acme.cloudflareaccess.com"},
+		"AGENTS.md":                           {"https://field-notes.apps.example.org", "Vite on 127.0.0.1:5250", "cfTeamDomain: acme.cloudflareaccess.com", "caller-field-notes-key"},
 		"CLAUDE.md":                           {"@AGENTS.md"},
 		"web/index.html":                      {`<html lang="de">`, `<title>Field Notes: Familie</title>`, `content="Field Notes: Familie" />`, `href="/pwa/icon-180.png"`},
 		"web/public/pwa/manifest.webmanifest": {`"name": "Field Notes: Familie"`, `"lang": "de"`},

@@ -14,24 +14,31 @@ func TestNotesRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	first, err := st.AddNote(ctx, "first")
+	first, err := st.AddNote(ctx, "alice", "first")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.AddNote(ctx, "second"); err != nil {
+	if _, err := st.AddNote(ctx, "alice", "second"); err != nil {
 		t.Fatal(err)
 	}
-	notes, err := st.Notes(ctx)
+	if _, err := st.AddNote(ctx, "bob", "bob's"); err != nil {
+		t.Fatal(err)
+	}
+	notes, err := st.Notes(ctx, "alice")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(notes) != 2 || notes[0].Text != "second" || notes[1].ID != first.ID {
 		t.Fatalf("notes = %+v", notes)
 	}
-	if err := st.DeleteNote(ctx, first.ID); err != nil {
+	// Another person neither sees nor deletes alice's notes.
+	if err := st.DeleteNote(ctx, "bob", first.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("bob deletes alice's note: %v", err)
+	}
+	if err := st.DeleteNote(ctx, "alice", first.ID); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.DeleteNote(ctx, first.ID); !errors.Is(err, ErrNotFound) {
+	if err := st.DeleteNote(ctx, "alice", first.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("second delete = %v, want ErrNotFound", err)
 	}
 	if err := st.Close(); err != nil {
@@ -44,7 +51,7 @@ func TestNotesRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer st.Close()
-	if notes, err := st.Notes(ctx); err != nil || len(notes) != 1 {
+	if notes, err := st.Notes(ctx, "alice"); err != nil || len(notes) != 1 {
 		t.Fatalf("after reopen: %+v, %v", notes, err)
 	}
 }
