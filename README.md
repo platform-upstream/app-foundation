@@ -139,6 +139,11 @@ the other security headers (nosniff, `Referrer-Policy: same-origin`, `X-Frame-Op
 no third-party origin). An app that adopts `web.Headers` without its own CSP must check its pages
 against that default.
 
+**`web.PublicFiles(spa, gated)` is the only safe way to serve `/pwa/` without a session.** Never
+use `web.Public(r)` to decide that the whole mux (or any handler but the static file handler) runs
+unauthenticated: every `GET /pwa/<anything>.<ext>` would then reach app routes without a session.
+The package example (`go doc web`) shows the canonical composition.
+
 Authentication must wrap the web handler so a signed-out document reaches Cloudflare Access rather
 than receiving the embedded shell. The frontend service worker must register network-first
 navigations before its precache route, use the cached shell only for ordinary offline navigation,

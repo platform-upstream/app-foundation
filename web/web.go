@@ -25,6 +25,13 @@ const PublicPrefix = "/pwa/"
 
 // Public reports whether a request is a GET or HEAD for a file under PublicPrefix. The path is
 // cleaned first, so "/pwa/../api/x" is not public.
+//
+// Do not build an authentication bypass on Public: compose with PublicFiles, which is the only
+// safe composition. Public says nothing about which handler answers; a gate such as
+// "if web.Public(r) { mux.ServeHTTP(w, r) } else { auth(mux).ServeHTTP(w, r) }" lets every
+// /pwa/<x>.<ext> request reach the whole mux without a session: an app route registered under
+// /pwa/, a GET handler with a wildcard pattern, or a mux that rewrites paths would then answer
+// unauthenticated. PublicFiles sends public requests to the static file handler only.
 func Public(r *http.Request) bool {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		return false
@@ -35,7 +42,8 @@ func Public(r *http.Request) bool {
 
 // PublicFiles sends Public requests to files (normally the Handler) without authentication and
 // every other request to protected (the application behind its Access middleware). Public
-// requests never reach the application's API.
+// requests never reach the application's API. It is the supported way to serve PublicPrefix; pass
+// the static file handler as files, never the application mux (see the package example).
 func PublicFiles(files, protected http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if Public(r) {
