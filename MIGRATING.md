@@ -10,9 +10,19 @@ In an app:
 go env -w GOPRIVATE=github.com/platform-upstream/*
 grep -rl 'github.com/\(castillo\|niiku\)-platform/app-foundation' --include='*.go' --include=go.mod . \
   | xargs sed -i 's#github.com/\(castillo\|niiku\)-platform/app-foundation#github.com/platform-upstream/app-foundation#g'
-go get github.com/platform-upstream/app-foundation@v1.0.0
+go mod edit -require=github.com/platform-upstream/app-foundation@v1.0.0   # before tidy: the old tag does not exist under the new path
 go mod tidy && go mod vendor && gofmt -w cmd internal
 go tool frontend-registry check -target web -modules api,pwa,pwa-shell   # sync + review if it differs
+```
+
+Then move manifest and icons to `web/public/pwa/` (links in `index.html`), let `web.Public` (or
+`web.PublicFiles`) pass them without a session, and add the host to `pwa_hosts` in the platform
+OpenTofu. Color did exactly this in castillo-platform/color fb0bd75.
+
+Windows: Go fetches the private module through git; give it gh as the credential helper:
+
+```bash
+export GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=credential.helper GIT_CONFIG_VALUE_0= \n  GIT_CONFIG_KEY_1=credential.helper GIT_CONFIG_VALUE_1='!gh auth git-credential'
 ```
 
 `appscaffold.Options` needs a `Platform` (org, domain, registry, Access team); the CLI reads it
