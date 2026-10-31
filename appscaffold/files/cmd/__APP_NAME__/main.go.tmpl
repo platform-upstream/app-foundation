@@ -87,19 +87,13 @@ func newHandler(st *store.Store, auth *access.Authenticator, origin string) (htt
 	mux.Handle("GET /healthz", server.Health())
 	mux.Handle("GET /readyz", server.Ready(st.Ping))
 	mux.Handle("/", web.PublicFiles(spa, gated))
-	return securityHeaders(mux), nil
+	return web.Headers(web.HeaderPolicy{CSP: csp})(mux), nil
 }
 
-func securityHeaders(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		h := w.Header()
-		h.Set("X-Content-Type-Options", "nosniff")
-		h.Set("Referrer-Policy", "same-origin")
-		h.Set("X-Frame-Options", "DENY")
-		h.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob:; style-src 'self'; script-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'")
-		next.ServeHTTP(w, r)
-	})
-}
+// csp is the app's Content-Security-Policy; web.Headers adds the other security headers (nosniff,
+// Referrer-Policy, X-Frame-Options, COOP, HSTS, Permissions-Policy). Widen it here when the app
+// needs another origin; keep inline script out.
+const csp = "default-src 'self'; img-src 'self' data: blob:; style-src 'self'; script-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {

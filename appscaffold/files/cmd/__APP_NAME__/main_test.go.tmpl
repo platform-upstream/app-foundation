@@ -35,8 +35,8 @@ func TestOnlyProbesAndPWAFilesArePublic(t *testing.T) {
 		if rec.Code != want {
 			t.Errorf("%s: got %d, want %d", path, rec.Code, want)
 		}
-		if rec.Header().Get("Content-Security-Policy") == "" {
-			t.Errorf("%s: no Content-Security-Policy", path)
+		if rec.Header().Get("Content-Security-Policy") != csp || rec.Header().Get("X-Content-Type-Options") != "nosniff" {
+			t.Errorf("%s: security headers missing: %v", path, rec.Header())
 		}
 	}
 }

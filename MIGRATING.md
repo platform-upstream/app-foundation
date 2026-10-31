@@ -20,6 +20,9 @@ Optional adoptions (nothing breaks without them):
 - Readiness: mount `GET /readyz` with `server.Ready(dbPing)` next to `/healthz` and point the
   chart's `readinessProbe` at `/readyz` (liveness stays on `/healthz`). Drop any checks passed to
   `server.Health`; they were always ignored.
+- Security headers: replace the app's own header middleware with
+  `web.Headers(web.HeaderPolicy{CSP: <the app's CSP>})`. It adds COOP, HSTS and Permissions-Policy;
+  check the app against them (an app that embeds itself in a frame sets `FrameOptions: "SAMEORIGIN"`).
 
 # Migrating to v1.0.0 (platform-upstream)
 
