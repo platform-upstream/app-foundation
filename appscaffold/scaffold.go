@@ -48,7 +48,8 @@ type Platform struct {
 	Domain string `json:"domain"`
 	// Registry is the image registry host; images are <registry>/<org>/<name>.
 	Registry string `json:"registry"`
-	// AccessTeam is the Cloudflare Access team domain, <team>.cloudflareaccess.com.
+	// AccessTeam is the Cloudflare Access team domain, <team>.cloudflareaccess.com. It appears only
+	// as the example in the generated AGENTS.md; the chart requires cfTeamDomain from the wrapper.
 	AccessTeam string `json:"accessTeam"`
 }
 

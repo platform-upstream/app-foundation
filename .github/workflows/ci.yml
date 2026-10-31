@@ -64,6 +64,14 @@ jobs:
           { "org": "acme-apps", "domain": "apps.example.org", "registry": "registry.example.org", "accessTeam": "acme.cloudflareaccess.com" }
           JSON
           go run ./cmd/app-scaffold -platform "$RUNNER_TEMP/platform.json" -target ../probe -name probe -title "Probe: CI" -foundation v1.0.0
+      - name: Chart needs the platform's Access values from the wrapper
+        working-directory: probe
+        run: |
+          if grep -r acme.cloudflareaccess.com deploy; then echo "platform value in the chart"; exit 1; fi
+          if helm template probe deploy --set cfAccessAud=ci > /dev/null; then echo "rendered without cfTeamDomain"; exit 1; fi
+          helm template probe deploy --set cfAccessAud=ci --set cfTeamDomain=acme.cloudflareaccess.com > "$RUNNER_TEMP/chart.yaml"
+          grep -q 'path: /readyz' "$RUNNER_TEMP/chart.yaml"
+          grep -q 'value: "acme.cloudflareaccess.com"' "$RUNNER_TEMP/chart.yaml"
       - name: Vendor against this checkout
         working-directory: probe
         run: |

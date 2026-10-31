@@ -43,7 +43,7 @@ spec:
             - name: APP_ORIGIN
               value: {{ printf "https://%s" (required "hostname is required" .Values.hostname) | quote }}
             - name: CF_TEAM_DOMAIN
-              value: {{ .Values.cfTeamDomain | quote }}
+              value: {{ required "cfTeamDomain is required (<team>.cloudflareaccess.com, apps-production wrapper)" .Values.cfTeamDomain | quote }}
             - name: CF_ACCESS_AUD
               value: {{ required "cfAccessAud is required (tofu output -json app_auds)" .Values.cfAccessAud | quote }}
             - name: CF_ACCESS_SERVICE_TOKENS

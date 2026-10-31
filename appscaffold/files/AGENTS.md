@@ -60,3 +60,11 @@ them in WSL or Docker.
 Pushes to `main` deploy through the shared `ci-deliver` pipeline (registry
 `platform/ci/registry/__APP_NAME__.yaml`); the Dockerfile runs every check. Commits carry no
 attribution lines. Review with the `review` skill before pushing app and UI changes.
+
+The chart carries no platform values: the apps-production wrapper `__APP_NAME__-prod` sets the
+Access values (the chart refuses to render without them), on this platform:
+
+```yaml
+cfTeamDomain: __ACCESS_TEAM__
+cfAccessAud: <tofu output -json app_auds>
+```

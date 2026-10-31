@@ -24,8 +24,9 @@ in its config repository:
   "registry": "zot.int.jprinzbach.de", "accessTeam": "prinzbach.cloudflareaccess.com" }
 ```
 
-It yields the module path `github.com/<org>/<name>`, the hostname `<name>.<domain>`, the image
-`<registry>/<org>/<name>` and the chart's `cfTeamDomain`. `-org`, `-domain`, `-registry` and
+It yields the module path `github.com/<org>/<name>`, the hostname `<name>.<domain>` and the image
+`<registry>/<org>/<name>`. The Access team appears only in the generated AGENTS.md example: the
+chart's `cfTeamDomain` is empty and required, set by the deployment wrapper. `-org`, `-domain`, `-registry` and
 `-access-team` override single values; `-host`, `-module` and `-image` override the derived ones.
 
 ## What the generated app follows
