@@ -90,6 +90,9 @@ Keep readiness checks local (a database ping): a shared dependency that fails wo
 out of the service at once. The legacy `Health(check)` call shape still compiles for `v0.1.0`
 consumers, but the checks are ignored and passing any is deprecated.
 
+`access.ConfigFromEnv(listener)` reads the chart's `AUTH_MODE` (default `cloudflare`),
+`CF_TEAM_DOMAIN`, `CF_ACCESS_AUD` and `CF_ACCESS_SERVICE_TOKENS` and fails closed with an error that
+names the variable; its HTTP client bounds each JWKS fetch to five seconds.
 Cloudflare mode verifies one bounded `Cf-Access-Jwt-Assertion`, RS256, issuer, audience, expiry,
 issued-at, and subject against a bounded/cached JWKS fetch. Access is an owner gate, so there is no
 shared identity model: `Middleware` only puts a `Caller` into the request context (`CallerFrom`),

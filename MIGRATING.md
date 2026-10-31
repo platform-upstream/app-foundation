@@ -23,6 +23,8 @@ Optional adoptions (nothing breaks without them):
 - Security headers: replace the app's own header middleware with
   `web.Headers(web.HeaderPolicy{CSP: <the app's CSP>})`. It adds COOP, HSTS and Permissions-Policy;
   check the app against them (an app that embeds itself in a frame sets `FrameOptions: "SAMEORIGIN"`).
+- Authentication config: `cfg, err := access.ConfigFromEnv(addr)` then `access.New(cfg)` replaces
+  the hand-written `access.Config` from `AUTH_MODE`/`CF_*` (same variables, same separators).
 
 # Migrating to v1.0.0 (platform-upstream)
 
