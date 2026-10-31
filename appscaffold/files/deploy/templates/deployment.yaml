@@ -7,8 +7,13 @@ metadata:
 spec:
   replicas: {{ .Values.replicaCount }}
   revisionHistoryLimit: 1
+  # Releases without downtime: the new pod starts beside the old one. Safe with SQLite on the
+  # single node's RWO volume (WAL + busy_timeout from app-foundation/sqlite).
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       {{- include "__APP_NAME__.selectorLabels" . | nindent 6 }}
@@ -33,6 +38,16 @@ spec:
           env:
             - name: APP_ADDR
               value: ":8080"
+            - name: APP_DB
+              value: {{ ternary "/data/__APP_NAME__.sqlite" "/tmp/__APP_NAME__.sqlite" .Values.persistence.enabled | quote }}
+            - name: APP_ORIGIN
+              value: {{ printf "https://%s" (required "hostname is required" .Values.hostname) | quote }}
+            - name: CF_TEAM_DOMAIN
+              value: {{ .Values.cfTeamDomain | quote }}
+            - name: CF_ACCESS_AUD
+              value: {{ required "cfAccessAud is required (tofu output -json app_auds)" .Values.cfAccessAud | quote }}
+            - name: CF_ACCESS_SERVICE_TOKENS
+              value: {{ .Values.cfAccessServiceTokens | quote }}
             - name: GOMEMLIMIT
               value: {{ .Values.runtime.goMemLimit | quote }}
             - name: GOMAXPROCS
@@ -48,6 +63,11 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
+          # Keep serving while Traefik drops the old endpoint (distroless: native sleep, no shell).
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 8
           readinessProbe:
             httpGet:
               path: /healthz

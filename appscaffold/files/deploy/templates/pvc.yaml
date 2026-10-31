@@ -5,6 +5,9 @@ metadata:
   name: {{ .Release.Name }}-data
   labels:
     {{- include "__APP_NAME__.labels" . | nindent 4 }}
+  annotations:
+    # The database lives here: uninstalling the release never deletes it.
+    helm.sh/resource-policy: keep
 spec:
   accessModes: [ReadWriteOnce]
   {{- with .Values.persistence.storageClassName }}

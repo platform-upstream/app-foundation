@@ -1,0 +1,7 @@
+.local/
+node_modules/
+web/dist/
+/__APP_NAME__
+*.sqlite*
+*.db
+.env*

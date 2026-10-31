@@ -251,7 +251,7 @@ func TestConcurrentRefreshUsesNewGenerationDuringCooldown(t *testing.T) {
 	// Request A has already captured the old generation. Hold it at that exact point while
 	// request B refreshes the rotated key and starts the cooldown.
 	oldKeys, fresh, oldGeneration := keys.snapshot()
-	parsed, err := jose.ParseSigned(token2, []jose.SignatureAlgorithm{jose.RS256})
+	parsed, err := jose.ParseSignedCompact(token2, []jose.SignatureAlgorithm{jose.RS256})
 	if err != nil {
 		t.Fatal(err)
 	}

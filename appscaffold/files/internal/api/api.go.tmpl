@@ -1,0 +1,87 @@
+// Package api holds the HTTP handlers. Handlers stay thin: decoding and validation here, SQL in
+// store. The scaffold's notes are an example; replace them with the app's own routes.
+package api
+
+import (
+	"errors"
+	"log/slog"
+	"net/http"
+	"strconv"
+	"strings"
+	"unicode/utf8"
+
+	"github.com/castillo-platform/app-foundation/httpx"
+	"__MODULE__/internal/store"
+)
+
+const maxNoteRunes = 500
+
+type API struct {
+	store  *store.Store
+	origin string
+}
+
+// New returns the API. origin is the public origin (https://__APP_HOST__); mutations from any
+// other site are refused.
+func New(st *store.Store, origin string) *API { return &API{store: st, origin: origin} }
+
+// Routes returns the API mux, mounted under /api/.
+func (a *API) Routes() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/notes", a.notes)
+	mux.HandleFunc("POST /api/notes", a.addNote)
+	mux.HandleFunc("DELETE /api/notes/{id}", a.deleteNote)
+	mux.Handle("/api/", httpx.NotFound("Not found."))
+	return httpx.SameOrigin([]string{a.origin}, nil)(mux)
+}
+
+func (a *API) notes(w http.ResponseWriter, r *http.Request) {
+	notes, err := a.store.Notes(r.Context())
+	if err != nil {
+		internal(w, r, err)
+		return
+	}
+	_ = httpx.WriteJSON(w, http.StatusOK, notes)
+}
+
+func (a *API) addNote(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Text string `json:"text"`
+	}
+	if err := httpx.DecodeJSON(w, r, &body, httpx.DefaultJSONBodyLimit); err != nil {
+		_ = httpx.WriteError(w, httpx.StatusCode(err), "Invalid request.")
+		return
+	}
+	text := strings.TrimSpace(body.Text)
+	if text == "" || utf8.RuneCountInString(text) > maxNoteRunes {
+		_ = httpx.WriteError(w, http.StatusBadRequest, "A note needs 1 to 500 characters.")
+		return
+	}
+	note, err := a.store.AddNote(r.Context(), text)
+	if err != nil {
+		internal(w, r, err)
+		return
+	}
+	_ = httpx.WriteJSON(w, http.StatusCreated, note)
+}
+
+func (a *API) deleteNote(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		_ = httpx.WriteError(w, http.StatusNotFound, "Not found.")
+		return
+	}
+	switch err := a.store.DeleteNote(r.Context(), id); {
+	case errors.Is(err, store.ErrNotFound):
+		_ = httpx.WriteError(w, http.StatusNotFound, "Not found.")
+	case err != nil:
+		internal(w, r, err)
+	default:
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func internal(w http.ResponseWriter, r *http.Request, err error) {
+	slog.Error("request failed", "method", r.Method, "path", r.URL.Path, "error", err)
+	_ = httpx.WriteError(w, http.StatusInternalServerError, "Something went wrong.")
+}

@@ -64,7 +64,7 @@ func newBoundedRemoteKeySet(url string, client *http.Client) *boundedRemoteKeySe
 // VerifySignature parses only RS256 and verifies against a bounded cached key set. Issuer,
 // audience, expiry, and required claims remain the oidc verifier's responsibility.
 func (r *boundedRemoteKeySet) VerifySignature(ctx context.Context, raw string) ([]byte, error) {
-	jws, err := jose.ParseSigned(raw, []jose.SignatureAlgorithm{jose.RS256})
+	jws, err := jose.ParseSignedCompact(raw, []jose.SignatureAlgorithm{jose.RS256})
 	if err != nil {
 		return nil, fmt.Errorf("parse signed JWT: %w", err)
 	}

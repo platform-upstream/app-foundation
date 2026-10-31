@@ -1,0 +1,95 @@
+// Package store owns the SQLite database. All SQL of the app lives here.
+package store
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/castillo-platform/app-foundation/sqlite"
+	"__MODULE__/migrations"
+)
+
+// ErrNotFound reports a missing row.
+var ErrNotFound = errors.New("not found")
+
+// Note is the example record of the scaffold: replace it with the app's own data.
+type Note struct {
+	ID        int64     `json:"id"`
+	Text      string    `json:"text"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+type Store struct {
+	db  *sql.DB
+	now func() time.Time
+}
+
+// Open opens the database at path, creating its directory, and applies pending migrations.
+func Open(ctx context.Context, path string) (*Store, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		return nil, err
+	}
+	db, err := sqlite.Open(ctx, path, sqlite.Options{})
+	if err != nil {
+		return nil, err
+	}
+	if err := sqlite.Migrate(ctx, db, migrations.FS, "."); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	return &Store{db: db, now: time.Now}, nil
+}
+
+func (s *Store) Close() error { return s.db.Close() }
+
+// Notes returns all notes, newest first.
+func (s *Store) Notes(ctx context.Context) ([]Note, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id, text, created_at FROM notes ORDER BY id DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	notes := []Note{}
+	for rows.Next() {
+		var n Note
+		var created int64
+		if err := rows.Scan(&n.ID, &n.Text, &created); err != nil {
+			return nil, err
+		}
+		n.CreatedAt = time.UnixMilli(created).UTC()
+		notes = append(notes, n)
+	}
+	return notes, rows.Err()
+}
+
+// AddNote stores a note and returns it.
+func (s *Store) AddNote(ctx context.Context, text string) (Note, error) {
+	created := s.now().UTC().Truncate(time.Millisecond)
+	result, err := s.db.ExecContext(ctx, `INSERT INTO notes (text, created_at) VALUES (?, ?)`, text, created.UnixMilli())
+	if err != nil {
+		return Note{}, err
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		return Note{}, err
+	}
+	return Note{ID: id, Text: text, CreatedAt: created}, nil
+}
+
+// DeleteNote removes a note; ErrNotFound when it does not exist.
+func (s *Store) DeleteNote(ctx context.Context, id int64) error {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM notes WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	if n, err := result.RowsAffected(); err != nil {
+		return err
+	} else if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}

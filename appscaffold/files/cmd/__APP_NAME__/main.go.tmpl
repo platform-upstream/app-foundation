@@ -1,0 +1,110 @@
+// Command __APP_NAME__ serves __APP_TITLE__: its JSON API and the embedded React frontend.
+package main
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+	"time"
+
+	"github.com/castillo-platform/app-foundation/access"
+	"github.com/castillo-platform/app-foundation/httpx"
+	"github.com/castillo-platform/app-foundation/server"
+	"github.com/castillo-platform/app-foundation/web"
+	"__MODULE__/internal/api"
+	"__MODULE__/internal/store"
+	appweb "__MODULE__/web"
+)
+
+func main() {
+	if err := run(); err != nil {
+		slog.Error("__APP_NAME__ stopped", "error", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// The chart sets APP_ADDR=:8080. The default is the local preview, where AUTH_MODE=local is
+	// accepted because the listener is loopback.
+	addr := env("APP_ADDR", "127.0.0.1:__APP_PORT__")
+	auth, err := access.New(access.Config{
+		Mode:                  access.Mode(env("AUTH_MODE", string(access.ModeCloudflare))),
+		Listener:              addr,
+		TeamDomain:            os.Getenv("CF_TEAM_DOMAIN"),
+		Audience:              os.Getenv("CF_ACCESS_AUD"),
+		ServiceTokenClientIDs: list(os.Getenv("CF_ACCESS_SERVICE_TOKENS")),
+		HTTPClient:            &http.Client{Timeout: 5 * time.Second},
+	})
+	if err != nil {
+		return err
+	}
+	st, err := store.Open(ctx, env("APP_DB", ".local/__APP_NAME__.sqlite"))
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := st.Close(); err != nil {
+			slog.Error("close database", "error", err)
+		}
+	}()
+	handler, err := newHandler(st, auth, os.Getenv("APP_ORIGIN"))
+	if err != nil {
+		return err
+	}
+	slog.Info("__APP_NAME__ listening", "address", addr)
+	return server.Run(ctx, server.New(addr, handler))
+}
+
+// newHandler composes the routes in the foundation's order: security headers, the public shallow
+// /healthz, the public /pwa/ files (manifest and icons, see web.PublicPrefix), then Cloudflare
+// Access for everything else, static files included.
+func newHandler(st *store.Store, auth *access.Authenticator, origin string) (http.Handler, error) {
+	if auth == nil {
+		return nil, errors.New("authenticator is required")
+	}
+	spa, err := web.Handler(appweb.Files())
+	if err != nil {
+		return nil, err
+	}
+	protected := http.NewServeMux()
+	protected.Handle("/api/", api.New(st, origin).Routes())
+	protected.Handle("/", spa)
+	gated := auth.Middleware(func(w http.ResponseWriter, _ *http.Request, _ error) {
+		_ = httpx.WriteError(w, http.StatusUnauthorized, "Please sign in again.")
+	})(protected)
+
+	mux := http.NewServeMux()
+	mux.Handle("GET /healthz", server.Health())
+	mux.Handle("/", web.PublicFiles(spa, gated))
+	return securityHeaders(mux), nil
+}
+
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("Referrer-Policy", "same-origin")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob:; style-src 'self'; script-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func env(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
+func list(value string) []string {
+	return strings.FieldsFunc(value, func(r rune) bool { return r == ',' || r == ' ' })
+}

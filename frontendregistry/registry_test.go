@@ -86,8 +86,8 @@ func TestTemplateIncludesRequiredPWAModule(t *testing.T) {
 	}
 	for name, required := range map[string]string{
 		"vite.config.ts":                            "base: '/'",
-		"index.html":                                `href="/manifest.webmanifest"`,
-		"public/manifest.webmanifest":               `"start_url": "/"`,
+		"index.html":                                `href="/pwa/manifest.webmanifest"`,
+		"public/pwa/manifest.webmanifest":           `"start_url": "/"`,
 		"src/foundation/api.ts":                     "new URL('/api/', location.origin)",
 		"src/foundation/register-service-worker.ts": "new URL(options.base ?? '/', origin)",
 	} {

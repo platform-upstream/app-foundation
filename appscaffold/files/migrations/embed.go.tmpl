@@ -1,0 +1,7 @@
+// Package migrations embeds the SQLite schema migrations (<version>_<name>.sql, forward-only).
+package migrations
+
+import "embed"
+
+//go:embed *.sql
+var FS embed.FS

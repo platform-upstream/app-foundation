@@ -27,7 +27,7 @@
     { "module": "template", "source": "sources/template/tsconfig.json", "target": "tsconfig.json" },
     { "module": "template", "source": "sources/template/vite.config.ts", "target": "vite.config.ts" },
     { "module": "template", "source": "sources/template/index.html", "target": "index.html" },
-    { "module": "template", "source": "sources/template/manifest.webmanifest", "target": "public/manifest.webmanifest" },
+    { "module": "template", "source": "sources/template/manifest.webmanifest", "target": "public/pwa/manifest.webmanifest" },
     { "module": "template", "source": "sources/template/main.tsx", "target": "src/main.tsx" },
     { "module": "template", "source": "sources/template/vite-env.d.ts", "target": "src/vite-env.d.ts" },
     { "module": "template", "source": "sources/template/App.tsx", "target": "src/App.tsx" },

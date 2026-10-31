@@ -5,24 +5,31 @@ image:
   tag: "0.0.1"
   pullPolicy: IfNotPresent
 
+hostname: __APP_HOST__
+cfTeamDomain: prinzbach.cloudflareaccess.com
+# Audience of the app's Cloudflare Access application; set in the apps-production wrapper
+# (platform/.opentofu: tofu output -json app_auds).
+cfAccessAud: ""
+# Client IDs of Access service tokens accepted besides people, comma-separated (agent-verify).
+cfAccessServiceTokens: ""
+
 ingress:
-  enabled: false
   className: traefik
-  hostname: ""
 
 persistence:
   enabled: true
   storageClassName: ""
   size: 1Gi
 
+# Starting values; replace them with measured ones (Console shows the pod's usage).
 resources:
   requests:
     cpu: 5m
-    memory: 16Mi
+    memory: 24Mi
   limits:
     cpu: 500m
-    memory: 64Mi
+    memory: 128Mi
 
 runtime:
-  goMemLimit: 48MiB
+  goMemLimit: 96MiB
   goMaxProcs: "2"

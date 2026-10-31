@@ -1,0 +1,50 @@
+package store
+
+import (
+	"context"
+	"errors"
+	"path/filepath"
+	"testing"
+)
+
+func TestNotesRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "data", "test.sqlite")
+	st, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := st.AddNote(ctx, "first")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.AddNote(ctx, "second"); err != nil {
+		t.Fatal(err)
+	}
+	notes, err := st.Notes(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(notes) != 2 || notes[0].Text != "second" || notes[1].ID != first.ID {
+		t.Fatalf("notes = %+v", notes)
+	}
+	if err := st.DeleteNote(ctx, first.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.DeleteNote(ctx, first.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("second delete = %v, want ErrNotFound", err)
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Reopening applies no migration twice and keeps the data.
+	st, err = Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if notes, err := st.Notes(ctx); err != nil || len(notes) != 1 {
+		t.Fatalf("after reopen: %+v, %v", notes, err)
+	}
+}

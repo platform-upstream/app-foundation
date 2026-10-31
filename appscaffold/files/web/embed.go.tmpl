@@ -1,0 +1,20 @@
+// Package web embeds the built Vite frontend. Build it first (cd web && pnpm build); the
+// Dockerfile does that before the Go stage.
+package web
+
+import (
+	"embed"
+	"io/fs"
+)
+
+//go:embed all:dist
+var built embed.FS
+
+// Files returns the Vite distribution without the embed root.
+func Files() fs.FS {
+	files, err := fs.Sub(built, "dist")
+	if err != nil {
+		panic(err)
+	}
+	return files
+}

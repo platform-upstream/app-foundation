@@ -9,9 +9,12 @@
 * { box-sizing: border-box; }
 body { min-width: 320px; font-size: 17px; }
 button, input, textarea, select { font: inherit; }
+/* iOS zooms into a focused field under 16px and does not zoom back out. */
+input, textarea, select { font-size: max(16px, 1em); }
 :focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
 
-/* Top bar: carries the page title and pads the status bar (black-translucent). */
+/* Top bar: carries the page title. It pads the safe area too, so switching index.html to the
+   black-translucent status bar needs no change here. */
 .topbar {
   padding: max(0.75rem, env(safe-area-inset-top)) 1rem 0.75rem;
   background: #ffffff;

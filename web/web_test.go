@@ -102,3 +102,53 @@ func TestHandlerDoesNotTurnFilesystemErrorsIntoSPAResponses(t *testing.T) {
 		t.Fatalf("response = %d cache=%q body=%q", w.Code, w.Header().Get("Cache-Control"), w.Body.String())
 	}
 }
+
+func TestPublicPrefix(t *testing.T) {
+	handler, err := Handler(fstest.MapFS{
+		"index.html":               {Data: []byte("<html>App</html>")},
+		"pwa/manifest.webmanifest": {Data: []byte(`{"name":"App"}`)},
+		"pwa/icon-180.png":         {Data: []byte("png")},
+		"pwa/nested/readme.txt":    {Data: []byte("text")},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	protected := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	})
+	app := PublicFiles(handler, protected)
+	tests := []struct {
+		method, path string
+		status       int
+		cache        string
+	}{
+		{http.MethodGet, "/pwa/manifest.webmanifest", 200, "no-cache"},
+		{http.MethodHead, "/pwa/icon-180.png", 200, "no-cache"},
+		{http.MethodGet, "/pwa/missing.png", 404, "no-store"},
+		{http.MethodGet, "/pwa/nested/readme.txt", 200, "no-cache"},
+		// Directories and extensionless paths never reach the files unauthenticated.
+		{http.MethodGet, "/pwa/", 401, ""},
+		{http.MethodGet, "/pwa/nested", 401, ""},
+		// Cleaning happens before the decision.
+		{http.MethodGet, "/pwa/../api/items.json", 401, ""},
+		{http.MethodGet, "/pwa/%2e%2e/index.html", 401, ""},
+		{http.MethodPost, "/pwa/icon-180.png", 401, ""},
+		{http.MethodGet, "/", 401, ""},
+		{http.MethodGet, "/pwafake/x.png", 401, ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.method+" "+tc.path, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			app.ServeHTTP(w, httptest.NewRequest(tc.method, tc.path, nil))
+			if w.Code != tc.status || w.Header().Get("Cache-Control") != tc.cache {
+				t.Fatalf("status=%d cache=%q, want %d %q", w.Code, w.Header().Get("Cache-Control"), tc.status, tc.cache)
+			}
+		})
+	}
+	// Behind authentication, a directory under the prefix is a 404, not the SPA shell.
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/pwa/nested", nil))
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("directory under prefix = %d, want 404", w.Code)
+	}
+}

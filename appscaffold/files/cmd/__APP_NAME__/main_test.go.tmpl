@@ -1,0 +1,71 @@
+package main
+
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/castillo-platform/app-foundation/access"
+	"__MODULE__/internal/store"
+)
+
+// Only /healthz and the /pwa/ files (manifest and icons for the iOS home screen) answer without a
+// session; the document, the API and every other file need one.
+func TestOnlyHealthAndPWAFilesArePublic(t *testing.T) {
+	handler := testHandler(t)
+	for path, want := range map[string]int{
+		"/healthz":                  http.StatusOK,
+		"/pwa/manifest.webmanifest": http.StatusOK,
+		"/pwa/icon-180.png":         http.StatusOK,
+		"/pwa/":                     http.StatusUnauthorized,
+		"/":                         http.StatusUnauthorized,
+		"/index.html":               http.StatusUnauthorized,
+		"/sw.js":                    http.StatusUnauthorized,
+		"/api/notes":                http.StatusUnauthorized,
+		// ServeMux redirects to the cleaned path, which then needs a session.
+		"/pwa/../api/notes": http.StatusTemporaryRedirect,
+	} {
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != want {
+			t.Errorf("%s: got %d, want %d", path, rec.Code, want)
+		}
+		if rec.Header().Get("Content-Security-Policy") == "" {
+			t.Errorf("%s: no Content-Security-Policy", path)
+		}
+	}
+}
+
+func TestSignedInRequestReachesAppAndAPI(t *testing.T) {
+	handler := testHandler(t)
+	for path, contains := range map[string]string{"/": "<div id=\"root\">", "/api/notes": "[]"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.RemoteAddr = "127.0.0.1:40000" // local mode admits loopback peers only
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), contains) {
+			t.Errorf("%s: got %d %q", path, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+func testHandler(t *testing.T) http.Handler {
+	t.Helper()
+	st, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "test.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	auth, err := access.New(access.Config{Mode: access.ModeLocal, Listener: "127.0.0.1:0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler, err := newHandler(st, auth, "https://__APP_HOST__")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return handler
+}

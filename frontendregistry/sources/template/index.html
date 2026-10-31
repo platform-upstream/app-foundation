@@ -4,9 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- default: the status bar takes the theme colour and dark text. black-translucent puts the
+         page under the status bar (white text, top bar pads env(safe-area-inset-top)); only for a
+         dark top bar. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Foundation" />
     <meta name="theme-color" content="#ffffff" />
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- Manifest and icons live under /pwa/: the only path Cloudflare Access and the backend serve
+         without a session, because iOS fetches them without the cookie. -->
+    <link rel="manifest" href="/pwa/manifest.webmanifest" />
+    <link rel="icon" href="/pwa/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/pwa/icon-180.png" />
     <title>Foundation app</title>
   </head>
   <body>
