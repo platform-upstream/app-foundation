@@ -83,3 +83,7 @@ are a starting point, not a shared theme.
 The local acceptance fixture is retained under the workspace's ignored `artifacts/fnd008/`. A fresh
 registry install passed registry check, frozen-lockfile install, strict type checking, and production
 Vite build.
+
+The `template` module's `index.html` and `public/pwa/manifest.webmanifest` point at
+`/pwa/icon.svg` and `/pwa/icon-{180,192,512}.png`; the registry ships no icons. `app-scaffold` draws
+a starting set; an app that installs `template` on its own adds these four files itself.

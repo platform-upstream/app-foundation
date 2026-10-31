@@ -1,6 +1,6 @@
 apiVersion: v2
 name: __APP_NAME__
-description: __APP_TITLE__ (Go + SQLite with an embedded React frontend)
+description: "__APP_TITLE__ (Go + SQLite with an embedded React frontend)"
 type: application
 # CI rewrites chart and app versions for a release. The image remains chart-owned.
 version: 0.0.1

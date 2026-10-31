@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/castillo-platform/app-foundation/frontendregistry"
 	"github.com/castillo-platform/app-foundation/internal/sourcetree"
@@ -78,7 +79,8 @@ func (o *Options) normalize() error {
 	if o.Title == "" {
 		o.Title = strings.ToUpper(o.Name[:1]) + strings.ReplaceAll(o.Name[1:], "-", " ")
 	}
-	if strings.ContainsAny(o.Title, "<>\"&\\`\r\n") || len(o.Title) > 60 {
+	// The title lands in HTML, JSON, a quoted YAML string and Go comments: plain text only.
+	if strings.ContainsAny(o.Title, "<>\"&\\`") || strings.ContainsFunc(o.Title, unicode.IsControl) || len(o.Title) > 60 {
 		return fmt.Errorf("app scaffold title %q must be plain text up to 60 bytes", o.Title)
 	}
 	if o.Hostname == "" {

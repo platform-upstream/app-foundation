@@ -33,7 +33,7 @@ func read(t *testing.T, target, name string) string {
 }
 
 func TestGenerateRendersCompleteApp(t *testing.T) {
-	target := generate(t, Options{Name: "field-notes", FoundationVersion: "v0.21.0", Title: "Field Notes", Lang: "de", Color: "#2F6FDE", Port: 8150})
+	target := generate(t, Options{Name: "field-notes", FoundationVersion: "v0.21.0", Title: "Field Notes: Familie", Lang: "de", Color: "#2F6FDE", Port: 8150})
 
 	// No placeholder survives anywhere, in the scaffold's files or the registry's.
 	err := filepath.WalkDir(target, func(name string, entry fs.DirEntry, err error) error {
@@ -65,8 +65,8 @@ func TestGenerateRendersCompleteApp(t *testing.T) {
 		".ci/pipeline.yaml":                   {"name: field-notes"},
 		"AGENTS.md":                           {"https://field-notes.jprinzbach.de", "Vite on 127.0.0.1:5250"},
 		"CLAUDE.md":                           {"@AGENTS.md"},
-		"web/index.html":                      {`<html lang="de">`, `<title>Field Notes</title>`, `content="Field Notes" />`, `href="/pwa/icon-180.png"`},
-		"web/public/pwa/manifest.webmanifest": {`"name": "Field Notes"`, `"lang": "de"`},
+		"web/index.html":                      {`<html lang="de">`, `<title>Field Notes: Familie</title>`, `content="Field Notes: Familie" />`, `href="/pwa/icon-180.png"`},
+		"web/public/pwa/manifest.webmanifest": {`"name": "Field Notes: Familie"`, `"lang": "de"`},
 		"web/package.json":                    {`"name": "field-notes-web"`},
 		"web/public/sw.js":                    {`'field-notes-shell:'`},
 		"web/vite.config.ts":                  {"port: 5250", "'http://127.0.0.1:8150'"},
@@ -168,6 +168,7 @@ func TestGenerateRejectsInvalidOptions(t *testing.T) {
 		{Name: "app", FoundationVersion: "v0.21.0", ImageRepository: "example/app:latest"},
 		{Name: "app", FoundationVersion: "v0.21.0", Color: "blue"},
 		{Name: "app", FoundationVersion: "v0.21.0", Title: `A "quoted" title`},
+		{Name: "app", FoundationVersion: "v0.21.0", Title: "Tab	here"},
 		{Name: "app", FoundationVersion: "v0.21.0", Hostname: "not a host"},
 		{Name: "app", FoundationVersion: "v0.21.0", Port: 80},
 		{Name: "app", FoundationVersion: "v0.21.0", Lang: "deu"},

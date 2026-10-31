@@ -14,6 +14,8 @@ working example of the whole round trip: replace it with the app's own, keep the
   `/pwa/`, then Access for everything else). Thin handlers in `internal/api`, logic in domain
   packages, SQL only in `internal/store`, forward-only migrations in `migrations/`
   (`002_<name>.sql`, never edit an applied one). Each outside service behind one small interface.
+- Migrations are additive: a release rolls (old and new pod overlap for seconds on the same
+  database), so the old code must survive the new schema. Rename or drop a column in two releases.
 - Frontend in `web/src`: `features/<x>/`, `lib/`, `components/` for shared primitives; imports point
   downward only. `web/src/foundation/` is registry-owned (`go tool frontend-registry check`); do
   not edit it, `sync` after an app-foundation bump and review the diff.
