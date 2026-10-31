@@ -1,5 +1,0 @@
-.local/
-.playwright-cli/
-web/dist/
-web/node_modules/
-coverage.out

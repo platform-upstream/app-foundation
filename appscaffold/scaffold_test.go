@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/castillo-platform/app-foundation/frontendregistry"
+	"github.com/platform-upstream/app-foundation/frontendregistry"
 )
 
 func generate(t *testing.T, options Options) string {
@@ -33,7 +33,7 @@ func read(t *testing.T, target, name string) string {
 }
 
 func TestGenerateRendersCompleteApp(t *testing.T) {
-	target := generate(t, Options{Name: "field-notes", FoundationVersion: "v0.21.0", Title: "Field Notes: Familie", Lang: "de", Color: "#2F6FDE", Port: 8150})
+	target := generate(t, Options{Name: "field-notes", FoundationVersion: "v1.0.0", Platform: testPlatform, Title: "Field Notes: Familie", Lang: "de", Color: "#2F6FDE", Port: 8150})
 
 	// No placeholder survives anywhere, in the scaffold's files or the registry's.
 	err := filepath.WalkDir(target, func(name string, entry fs.DirEntry, err error) error {
@@ -57,13 +57,13 @@ func TestGenerateRendersCompleteApp(t *testing.T) {
 	}
 
 	for name, want := range map[string][]string{
-		"go.mod":                              {"module github.com/castillo-platform/field-notes", "app-foundation v0.21.0", "go 1.27.0"},
-		"cmd/field-notes/main.go":             {`"github.com/castillo-platform/field-notes/internal/api"`, `"127.0.0.1:8150"`},
-		"deploy/values.yaml":                  {"repository: zot.int.jprinzbach.de/castillo-platform/field-notes", "hostname: field-notes.jprinzbach.de"},
+		"go.mod":                              {"module github.com/acme-apps/field-notes", "app-foundation v1.0.0", "go 1.27.0"},
+		"cmd/field-notes/main.go":             {`"github.com/acme-apps/field-notes/internal/api"`, `"127.0.0.1:8150"`},
+		"deploy/values.yaml":                  {"repository: registry.example.org/acme-apps/field-notes", "hostname: field-notes.apps.example.org", "cfTeamDomain: acme.cloudflareaccess.com"},
 		"deploy/Chart.yaml":                   {"name: field-notes"},
 		"Dockerfile":                          {"./cmd/field-notes", "static-debian13:nonroot"},
 		".ci/pipeline.yaml":                   {"name: field-notes"},
-		"AGENTS.md":                           {"https://field-notes.jprinzbach.de", "Vite on 127.0.0.1:5250"},
+		"AGENTS.md":                           {"https://field-notes.apps.example.org", "Vite on 127.0.0.1:5250"},
 		"CLAUDE.md":                           {"@AGENTS.md"},
 		"web/index.html":                      {`<html lang="de">`, `<title>Field Notes: Familie</title>`, `content="Field Notes: Familie" />`, `href="/pwa/icon-180.png"`},
 		"web/public/pwa/manifest.webmanifest": {`"name": "Field Notes: Familie"`, `"lang": "de"`},
@@ -114,15 +114,15 @@ func TestGenerateRendersCompleteApp(t *testing.T) {
 }
 
 func TestGenerateDefaults(t *testing.T) {
-	target := generate(t, Options{Name: "zz", FoundationVersion: "v1.2.3"})
+	target := generate(t, Options{Name: "zz", FoundationVersion: "v1.2.3", Platform: testPlatform})
 	if got := read(t, target, "web/index.html"); !strings.Contains(got, "<title>Zz</title>") || !strings.Contains(got, `lang="en"`) {
 		t.Fatalf("defaults not applied:\n%s", got)
 	}
-	options := Options{Name: "zz", FoundationVersion: "v1.2.3"}
+	options := Options{Name: "zz", FoundationVersion: "v1.2.3", Platform: testPlatform}
 	if err := options.normalize(); err != nil {
 		t.Fatal(err)
 	}
-	if options.Port < 8200 || options.Port > 8299 || options.Color == "" || options.Hostname != "zz.jprinzbach.de" {
+	if options.Port < 8200 || options.Port > 8299 || options.Color == "" || options.Hostname != "zz.apps.example.org" {
 		t.Fatalf("defaults: %+v", options)
 	}
 	for _, name := range Files() {
@@ -149,7 +149,7 @@ func TestGeneratePreflightsAllTargets(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(target, existing), []byte("consumer\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if err := Generate(target, Options{Name: "app", FoundationVersion: "v0.21.0"}); err == nil {
+		if err := Generate(target, Options{Name: "app", FoundationVersion: "v1.0.0", Platform: testPlatform}); err == nil {
 			t.Fatalf("generate replaced existing %s", existing)
 		}
 		for _, untouched := range []string{"Dockerfile", "web/index.html"} {
@@ -162,16 +162,16 @@ func TestGeneratePreflightsAllTargets(t *testing.T) {
 
 func TestGenerateRejectsInvalidOptions(t *testing.T) {
 	for _, options := range []Options{
-		{Name: "Bad_Name", FoundationVersion: "v0.21.0"},
+		{Name: "Bad_Name", FoundationVersion: "v1.0.0"},
 		{Name: "app"},
 		{Name: "app", FoundationVersion: "latest"},
-		{Name: "app", FoundationVersion: "v0.21.0", ImageRepository: "example/app:latest"},
-		{Name: "app", FoundationVersion: "v0.21.0", Color: "blue"},
-		{Name: "app", FoundationVersion: "v0.21.0", Title: `A "quoted" title`},
-		{Name: "app", FoundationVersion: "v0.21.0", Title: "Tab	here"},
-		{Name: "app", FoundationVersion: "v0.21.0", Hostname: "not a host"},
-		{Name: "app", FoundationVersion: "v0.21.0", Port: 80},
-		{Name: "app", FoundationVersion: "v0.21.0", Lang: "deu"},
+		{Name: "app", FoundationVersion: "v1.0.0", ImageRepository: "example/app:latest"},
+		{Name: "app", FoundationVersion: "v1.0.0", Color: "blue"},
+		{Name: "app", FoundationVersion: "v1.0.0", Title: `A "quoted" title`},
+		{Name: "app", FoundationVersion: "v1.0.0", Title: "Tab	here"},
+		{Name: "app", FoundationVersion: "v1.0.0", Hostname: "not a host"},
+		{Name: "app", FoundationVersion: "v1.0.0", Port: 80},
+		{Name: "app", FoundationVersion: "v1.0.0", Lang: "deu"},
 	} {
 		if err := Generate(t.TempDir(), options); err == nil {
 			t.Fatalf("accepted invalid options: %#v", options)
@@ -191,7 +191,7 @@ func TestGeneratedAppBuildsAndPassesItsTests(t *testing.T) {
 	}
 	_, self, _, _ := runtime.Caller(0)
 	foundation := filepath.Dir(filepath.Dir(self))
-	target := generate(t, Options{Name: "probe", FoundationVersion: "v0.21.0"})
+	target := generate(t, Options{Name: "probe", FoundationVersion: "v1.0.0", Platform: testPlatform})
 
 	// Stand in for the Vite build and point the module at this checkout.
 	if err := os.MkdirAll(filepath.Join(target, "web", "dist", "pwa"), 0o755); err != nil {
@@ -215,7 +215,7 @@ func TestGeneratedAppBuildsAndPassesItsTests(t *testing.T) {
 			t.Fatalf("go %s: %v\n%s", strings.Join(args, " "), err, out)
 		}
 	}
-	run("mod", "edit", "-replace", "github.com/castillo-platform/app-foundation="+foundation)
+	run("mod", "edit", "-replace", "github.com/platform-upstream/app-foundation="+foundation)
 	run("mod", "tidy")
 	run("vet", "./...")
 	run("test", "./...")
@@ -223,5 +223,21 @@ func TestGeneratedAppBuildsAndPassesItsTests(t *testing.T) {
 	cmd.Dir = target
 	if out, err := cmd.CombinedOutput(); err != nil || len(bytes.TrimSpace(out)) != 0 {
 		t.Fatalf("gofmt: %v %s", err, out)
+	}
+}
+
+var testPlatform = Platform{Org: "acme-apps", Domain: "apps.example.org", Registry: "registry.example.org", AccessTeam: "acme.cloudflareaccess.com"}
+
+func TestGenerateRequiresAValidPlatform(t *testing.T) {
+	for _, platform := range []Platform{
+		{},
+		{Org: "acme", Domain: "example.org", Registry: "registry.example.org"},
+		{Org: "acme", Domain: "example.org", Registry: "registry.example.org", AccessTeam: "acme.example.org"},
+		{Org: "acme/x", Domain: "example.org", Registry: "registry.example.org", AccessTeam: "acme.cloudflareaccess.com"},
+		{Org: "acme", Domain: "Example Org", Registry: "registry.example.org", AccessTeam: "acme.cloudflareaccess.com"},
+	} {
+		if err := Generate(t.TempDir(), Options{Name: "app", FoundationVersion: "v1.0.0", Platform: platform}); err == nil {
+			t.Fatalf("accepted platform %+v", platform)
+		}
 	}
 }

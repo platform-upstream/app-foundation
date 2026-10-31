@@ -50,7 +50,7 @@ func (e *Error) Error() string {
 
 // Config describes one gateway consumer.
 type Config struct {
-	// BaseURL is the API root including /v1, e.g. https://llm-api.int.jprinzbach.de/v1.
+	// BaseURL is the API root including /v1, e.g. https://llm-api.int.example.org/v1.
 	BaseURL string
 	// APIKey is the consumer's gateway key. Without one the client is disabled: Enabled reports
 	// false and calls return ErrDisabled, so the application can run without inference.

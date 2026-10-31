@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/castillo-platform/app-foundation/frontendregistry"
+	"github.com/platform-upstream/app-foundation/frontendregistry"
 )
 
 func main() {

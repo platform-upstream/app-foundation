@@ -1,7 +1,0 @@
-apiVersion: v2
-name: foundation-reference
-description: Local-only proof of the standard Go, SQLite, and embedded React foundation
-type: application
-# CI rewrites chart and app versions for a release. The image remains chart-owned.
-version: 0.0.1
-appVersion: "0.0.1"

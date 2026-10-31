@@ -1,87 +1,44 @@
-# Application delivery scaffold
+# App scaffold
 
-`app-scaffold` generates the repository-local Docker, CI, and Helm starting point for a stateful Go
-application with an embedded React/Vite frontend. It renders once and refuses to replace any target;
-the resulting files belong to the application and are expected to diverge where its behavior needs
-different resources, secrets, networking, or release checks.
-Generation rejects symlink parents and uses root-confined atomic writes so repository contents
-cannot redirect output outside the requested target.
-
-```bash
-go run github.com/castillo-platform/app-foundation/cmd/app-scaffold@v0.8.0 \
-  -target . \
-  -name example-app \
-  -image zot.int.jprinzbach.de/castillo-platform/example-app
-```
-
-The name must be a DNS label. The image argument is a repository without a tag. Generate into a
-repository that already follows the standard `cmd/`, `internal/`, `migrations/`, and `web/` layout;
-then review every generated file before committing it.
-
-The Dockerfile checks the registry-owned frontend files (`pwa`, `pwa-shell`); add the tool to
-`go.mod` first (`go get -tool github.com/castillo-platform/app-foundation/cmd/frontend-registry`,
-then `go mod vendor`).
-
-The generated `AGENTS.md` is a stub: fill in the first paragraph and the app-specific look, keep
-the pointers to the shared UI rules, the architecture specification and the `review` skill.
-
-## Docker and private modules
-
-The Dockerfile builds the frozen pnpm frontend first, then copies it into the Go embed directory.
-The Go stage format-checks, vets, tests, and builds with `-mod=vendor`; it performs no module fetch
-and accepts no credential argument or secret mount. Resolve an exact private foundation release on
-the trusted workstation and vendor it before building:
+`app-scaffold` renders a complete, deployable application into an empty repository: Go backend
+(Cloudflare Access, SQLite with migrations, security headers, public `/pwa/` files), the React/Vite
+frontend from the registry (`template`, `api`), a starting letter icon in the app colour, Dockerfile,
+`.ci/pipeline.yaml`, Helm chart and AGENTS.md. A notes feature runs through every layer as a
+working example. It renders once and refuses to replace anything; every file then belongs to the
+app. Generation rejects symlink parents and uses root-confined atomic writes.
 
 ```bash
-go env -w GOPRIVATE=github.com/castillo-platform/*
-go get github.com/castillo-platform/app-foundation@v0.8.0
-go mod tidy
-go mod vendor
-podman build -t example-app:local .
+go env -w GOPRIVATE=github.com/platform-upstream/*
+go run github.com/platform-upstream/app-foundation/cmd/app-scaffold@v1.0.0 \
+  -platform ../platform-config/platform.json -target ./notes -name notes -title "Notes"
+cd notes && go mod tidy && go mod vendor
 ```
 
-The runtime is the established distroless static non-root image and contains only `/app`. The chart
-provides writable `/tmp` and optional `/data` mounts while keeping the root filesystem read-only.
-The default build assumes one main package beneath `cmd/`; an application with multiple commands
-must make the output choice explicit in its owned Dockerfile.
+## Platform profile
 
-## Repository-local CI
+No platform's names live in this module. Each platform keeps one profile, e.g. `platform.json`
+in its config repository:
 
-`.ci/pipeline.yaml` follows the current direct-main `ci-deliver` contract: pnpm verifies the
-frontend, the Docker builder gates Go formatting/vet/tests, the repository owns one image, and the
-repository's `deploy/` chart is released with it. This scaffold does not change the shared runner,
-router, app-of-apps wrapper, or any production workload.
+```json
+{ "org": "castillo-platform", "domain": "jprinzbach.de",
+  "registry": "zot.int.jprinzbach.de", "accessTeam": "prinzbach.cloudflareaccess.com" }
+```
 
-## Helm defaults
+It yields the module path `github.com/<org>/<name>`, the hostname `<name>.<domain>`, the image
+`<registry>/<org>/<name>` and the chart's `cfTeamDomain`. `-org`, `-domain`, `-registry` and
+`-access-team` override single values; `-host`, `-module` and `-image` override the derived ones.
 
-- The chart owns `image.repository` and `image.tag`; a production wrapper must not shadow the
-  released chart image.
-- One replica, `Recreate`, and a `ReadWriteOnce` PVC avoid concurrent SQLite writers and RWO rollout
-  deadlocks.
-- The initial profile is 5m CPU / 16 MiB memory requested, 500m / 64 MiB limited, and
-  `GOMEMLIMIT=48MiB`. These are starting values that an app replaces with measured values.
-- The pod listens on all its interfaces (`APP_ADDR=:8080`); the namespace's NetworkPolicies decide
-  who may connect.
-- Service-account tokens and service links are disabled. Pod/container security contexts require
-  non-root UID/GID 65532, RuntimeDefault seccomp, no capabilities or privilege escalation, and a
-  read-only root filesystem.
-- Readiness and liveness are shallow `GET /healthz` probes. The PVC is optional for genuinely
-  stateless apps. Ingress is disabled until a hostname is supplied.
+## What the generated app follows
 
-ExternalSecrets, egress/ingress NetworkPolicies, RBAC, background schedules, backup annotations,
-and application environment variables are deliberately not generated: their least-privilege shape
-depends on the app. Add them in the consumer chart from demonstrated requirements.
+- Dockerfile: Node 26 + pnpm from npm (`packageManager`), Go stage with `frontend-registry check`,
+  gofmt, vet and tests against `vendor/`, distroless static non-root runtime. Cache mounts end in
+  `-${CACHE_SCOPE}` (CI contract).
+- Chart: chart-owned image, RollingUpdate with a native `preStop` sleep (Kubernetes 1.30+), PVC
+  with `helm.sh/resource-policy: keep`, read-only root filesystem, UID 65532, shallow `/healthz`
+  probes, Access values (`cfTeamDomain`, `cfAccessAud`, `cfAccessServiceTokens`).
+- Routes: security headers → `/healthz` → `web.PublicFiles` (`/pwa/` without a session) →
+  Access middleware → `/api/` (same-origin mutations) and the SPA.
+- Migrations are additive, because old and new pod overlap during a release.
 
-## Local acceptance evidence
-
-The ignored fixture at `artifacts/fnd009/` was generated with this command, composed with the
-frontend registry, and pinned to private `app-foundation v0.7.0` before vendoring. Validation passed:
-
-- Go vendored test, frontend frozen install/typecheck/build, and credential-free `podman build`;
-- distroless container execution as `65532:65532` with `--read-only`, writable tmpfs mounts, healthy
-  `/healthz`, and an embedded shell;
-- `helm lint`, disabled-ingress render, enabled-ingress render, and assertions for the chart-owned
-  image, probes, PVC, resource defaults, listen address, and security contexts; and
-- a source/image-history credential-pattern scan.
-
-No image was pushed and no chart was installed.
+`TestGeneratedAppBuildsAndPassesItsTests` generates an app, points it at the checkout and runs its
+`go vet` and `go test`, so the templates cannot rot unnoticed.

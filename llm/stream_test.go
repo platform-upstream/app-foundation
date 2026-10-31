@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/castillo-platform/app-foundation/llm"
-	"github.com/castillo-platform/app-foundation/llm/llmtest"
+	"github.com/platform-upstream/app-foundation/llm"
+	"github.com/platform-upstream/app-foundation/llm/llmtest"
 )
 
 func stream(t *testing.T, chunks []string, req llm.Request) (llm.Response, []llm.Event, error, llmtest.Request) {

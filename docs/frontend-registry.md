@@ -10,7 +10,7 @@ The tool is pinned with the rest of the foundation in the consumer's `go.mod` an
 it runs offline and checks against the pinned release:
 
 ```bash
-go get -tool github.com/castillo-platform/app-foundation/cmd/frontend-registry@v0.11.0
+go get -tool github.com/platform-upstream/app-foundation/cmd/frontend-registry@v0.11.0
 go mod vendor
 go tool frontend-registry list
 go tool frontend-registry install -target . -modules template,api

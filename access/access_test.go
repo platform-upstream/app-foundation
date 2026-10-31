@@ -389,19 +389,19 @@ func TestLocalModeRequiresLoopbackListener(t *testing.T) {
 }
 
 func TestTeamDomainIsLowercaseSingleLabel(t *testing.T) {
-	for _, domain := range []string{"n.cloudflareaccess.com", "prinzbach.cloudflareaccess.com", strings.Repeat("a", 63) + ".cloudflareaccess.com"} {
+	for _, domain := range []string{"n.cloudflareaccess.com", "acme.cloudflareaccess.com", strings.Repeat("a", 63) + ".cloudflareaccess.com"} {
 		if !validTeamDomain(domain) {
 			t.Errorf("valid team domain rejected: %q", domain)
 		}
 	}
 	for _, domain := range []string{
-		"-prinzbach.cloudflareaccess.com",
-		"niiku-.cloudflareaccess.com",
+		"-acme.cloudflareaccess.com",
+		"acme-.cloudflareaccess.com",
 		strings.Repeat("a", 64) + ".cloudflareaccess.com",
-		"Niiku.cloudflareaccess.com",
-		"niiku.dev.cloudflareaccess.com",
-		"niiku_test.cloudflareaccess.com",
-		"prinzbach.cloudflareaccess.com.evil.example",
+		"Acme.cloudflareaccess.com",
+		"acme.dev.cloudflareaccess.com",
+		"acme_test.cloudflareaccess.com",
+		"acme.cloudflareaccess.com.evil.example",
 	} {
 		if validTeamDomain(domain) {
 			t.Errorf("invalid team domain accepted: %q", domain)
@@ -411,7 +411,7 @@ func TestTeamDomainIsLowercaseSingleLabel(t *testing.T) {
 
 func TestCloudflareConfigRejectsWhitespaceAudience(t *testing.T) {
 	for _, audience := range []string{"", " audience", "audience ", "\taudience"} {
-		if _, err := New(Config{Mode: ModeCloudflare, TeamDomain: "prinzbach.cloudflareaccess.com", Audience: audience}); err == nil {
+		if _, err := New(Config{Mode: ModeCloudflare, TeamDomain: "acme.cloudflareaccess.com", Audience: audience}); err == nil {
 			t.Errorf("New accepted audience %q", audience)
 		}
 	}

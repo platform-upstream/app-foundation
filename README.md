@@ -1,6 +1,6 @@
 # app-foundation
 
-`app-foundation` is the deliberately small Go backend toolkit for niiku first-party applications.
+`app-foundation` is the deliberately small Go backend toolkit for the first-party applications of the platforms built on platform-upstream (castillo, niiku).
 It packages behavior already needed by Read and proven in Console, Cook, Watch, and Memory while
 leaving application routes, schema, copy, policy, and domain code in each app.
 
@@ -35,9 +35,8 @@ The source registry workflow and its deliberate non-abstractions are documented 
 [docs/frontend-registry.md](docs/frontend-registry.md).
 The credential-free delivery starting point and app-owned customization boundaries are documented
 in [docs/app-scaffold.md](docs/app-scaffold.md).
-The local-only [reference application](reference-app/README.md) composes every accepted Phase 1
-primitive and carries the full behavioral, browser, packaging, clean-build, and runtime proof. It
-is deliberately absent from all production workload repositories.
+The scaffold test generates a complete application and runs its own vet and tests on every run;
+it replaced the former reference application.
 
 ## Minimal use
 
@@ -165,8 +164,8 @@ keeps its own small interface in front of the client. Design and rollout:
 Developers and release automation that resolve the private module need GitHub authentication and:
 
 ```bash
-go env -w GOPRIVATE=github.com/castillo-platform/*
-go get github.com/castillo-platform/app-foundation@v0.1.0
+go env -w GOPRIVATE=github.com/platform-upstream/*
+go get github.com/platform-upstream/app-foundation@v0.1.0
 ```
 
 Consumers should pin an exact release. For container builds, resolve the module outside the image
@@ -176,20 +175,16 @@ GitHub credentials out of build arguments and image layers. `go mod vendor` reco
 
 ## Version and release policy
 
-The module follows SemVer and remains on `v0.x.y` while the first consumers prove the interfaces.
-Breaking pre-1.0 changes increment the minor version; compatible fixes increment the patch version.
-The initial `v0.1.0` may be cut from reviewed, green `main` once the Read inventory and independent
-foundation review confirm its interface. Later releases require an affected consumer to verify the
-changed interface before tagging:
+SemVer from v1.0.0 (see [MIGRATING.md](MIGRATING.md)). Two platforms consume it (castillo, niiku),
+so: compatible additions are a minor, fixes a patch, and a breaking change is a new major that
+both owners agree on first. Consumers pin an exact tag; Renovate proposes bumps. Before tagging,
+run the checks in WSL or Linux (Windows file locking breaks some tests):
 
 ```bash
-go test ./...
-go vet ./...
-go test -race ./...
-git tag -a v0.1.0 -m "app-foundation v0.1.0"
-git push origin v0.1.0
-gh release create v0.1.0 --verify-tag --generate-notes
+go test ./... && go vet ./... && go test -race ./...
+git tag -a vX.Y.Z -m "app-foundation vX.Y.Z" && git push origin vX.Y.Z
+gh release create vX.Y.Z --verify-tag --generate-notes
 ```
 
-No release tag is created as part of the initial skeleton commit; the coordinator owns the review
-gate and release decision.
+Nothing platform-specific goes in here: no org, domain, team, registry or secret path. Those come
+from the consumer (environment, chart values, the platform profile of the scaffold).

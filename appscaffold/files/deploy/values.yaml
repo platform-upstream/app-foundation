@@ -6,7 +6,7 @@ image:
   pullPolicy: IfNotPresent
 
 hostname: __APP_HOST__
-cfTeamDomain: prinzbach.cloudflareaccess.com
+cfTeamDomain: __ACCESS_TEAM__
 # Audience of the app's Cloudflare Access application; set in the apps-production wrapper
 # (platform/.opentofu: tofu output -json app_auds).
 cfAccessAud: ""

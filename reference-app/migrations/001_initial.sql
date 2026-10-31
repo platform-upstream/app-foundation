@@ -1,5 +1,0 @@
-CREATE TABLE items (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 120),
-  created_at TEXT NOT NULL
-);

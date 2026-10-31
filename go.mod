@@ -1,4 +1,4 @@
-module github.com/castillo-platform/app-foundation
+module github.com/platform-upstream/app-foundation
 
 go 1.26.0
 

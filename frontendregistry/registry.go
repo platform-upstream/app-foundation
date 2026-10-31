@@ -14,7 +14,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/castillo-platform/app-foundation/internal/sourcetree"
+	"github.com/platform-upstream/app-foundation/internal/sourcetree"
 )
 
 //go:embed registry.json sources

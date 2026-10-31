@@ -20,8 +20,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/castillo-platform/app-foundation/frontendregistry"
-	"github.com/castillo-platform/app-foundation/internal/sourcetree"
+	"github.com/platform-upstream/app-foundation/frontendregistry"
+	"github.com/platform-upstream/app-foundation/internal/sourcetree"
 )
 
 //go:embed all:files
@@ -36,29 +36,56 @@ var (
 	placeholder     = regexp.MustCompile(`__[A-Z][A-Z_]*__`)
 )
 
-// Platform defaults; every one can be overridden in Options.
-const (
-	DefaultOrg      = "castillo-platform"
-	DefaultDomain   = "jprinzbach.de"
-	DefaultRegistry = "zot.int.jprinzbach.de"
-)
-
 // frontendModules are installed into web/ from the frontend registry.
 var frontendModules = []string{"template", "api"}
 
-// Options describe the application. Only Name and FoundationVersion are required.
+// Platform describes the installation an app is generated for. Each platform keeps one profile
+// (platform.json in its config repository); no platform's names live in this module.
+type Platform struct {
+	// Org is the GitHub organisation of the app repositories: module github.com/<org>/<name>.
+	Org string `json:"org"`
+	// Domain: apps are served at <name>.<domain>.
+	Domain string `json:"domain"`
+	// Registry is the image registry host; images are <registry>/<org>/<name>.
+	Registry string `json:"registry"`
+	// AccessTeam is the Cloudflare Access team domain, <team>.cloudflareaccess.com.
+	AccessTeam string `json:"accessTeam"`
+}
+
+var (
+	githubOrg  = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$`)
+	accessTeam = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.cloudflareaccess\.com$`)
+)
+
+func (p Platform) validate() error {
+	switch {
+	case !githubOrg.MatchString(p.Org):
+		return fmt.Errorf("platform org %q is not a GitHub organisation name", p.Org)
+	case !hostname.MatchString(p.Domain):
+		return fmt.Errorf("platform domain %q is invalid", p.Domain)
+	case !hostname.MatchString(p.Registry):
+		return fmt.Errorf("platform registry %q must be a host name", p.Registry)
+	case !accessTeam.MatchString(p.AccessTeam):
+		return fmt.Errorf("platform access team %q must be <team>.cloudflareaccess.com", p.AccessTeam)
+	}
+	return nil
+}
+
+// Options describe the application. Name, FoundationVersion and Platform are required.
 type Options struct {
 	// Name is the DNS-label app name: repository, image, chart, command and hostname label.
 	Name string
 	// FoundationVersion is the app-foundation release the app pins (vX.Y.Z).
 	FoundationVersion string
+	// Platform the app is generated for.
+	Platform Platform
 	// Title is the human name (manifest, document title, home screen). Default: Name, capitalized.
 	Title string
-	// Hostname defaults to <name>.jprinzbach.de.
+	// Hostname defaults to <name>.<platform domain>.
 	Hostname string
-	// Module defaults to github.com/castillo-platform/<name>.
+	// Module defaults to github.com/<platform org>/<name>.
 	Module string
-	// ImageRepository (without tag) defaults to zot.int.jprinzbach.de/castillo-platform/<name>.
+	// ImageRepository (without tag) defaults to <platform registry>/<platform org>/<name>.
 	ImageRepository string
 	// Color (#rrggbb) of the starting icon. Default: a hue derived from the name.
 	Color string
@@ -83,20 +110,23 @@ func (o *Options) normalize() error {
 	if strings.ContainsAny(o.Title, "<>\"&\\`") || strings.ContainsFunc(o.Title, unicode.IsControl) || len(o.Title) > 60 {
 		return fmt.Errorf("app scaffold title %q must be plain text up to 60 bytes", o.Title)
 	}
+	if err := o.Platform.validate(); err != nil {
+		return err
+	}
 	if o.Hostname == "" {
-		o.Hostname = o.Name + "." + DefaultDomain
+		o.Hostname = o.Name + "." + o.Platform.Domain
 	}
 	if !hostname.MatchString(o.Hostname) {
 		return fmt.Errorf("app scaffold hostname %q is invalid", o.Hostname)
 	}
 	if o.Module == "" {
-		o.Module = "github.com/" + DefaultOrg + "/" + o.Name
+		o.Module = "github.com/" + o.Platform.Org + "/" + o.Name
 	}
 	if !modulePath.MatchString(o.Module) {
 		return fmt.Errorf("app scaffold module %q is invalid", o.Module)
 	}
 	if o.ImageRepository == "" {
-		o.ImageRepository = DefaultRegistry + "/" + DefaultOrg + "/" + o.Name
+		o.ImageRepository = o.Platform.Registry + "/" + o.Platform.Org + "/" + o.Name
 	}
 	if strings.ContainsAny(o.ImageRepository, " \t\r\n:@") {
 		return errors.New("app scaffold image repository may not contain whitespace, a tag or a digest")
@@ -133,6 +163,7 @@ func (o Options) replacer() *strings.Replacer {
 		"__MODULE__", o.Module,
 		"__IMAGE_REPOSITORY__", o.ImageRepository,
 		"__FOUNDATION_VERSION__", o.FoundationVersion,
+		"__ACCESS_TEAM__", o.Platform.AccessTeam,
 	)
 }
 
