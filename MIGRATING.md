@@ -1,3 +1,9 @@
+# Migrating to v1.3.0
+
+Compatible: `identity.Client.People(ctx)` lists everyone directory grants the app (kid profiles
+included), for services whose callers name people (memory) and for pickers;
+`identitytest.Directory.People` does the same in tests.
+
 # Migrating to v1.2.0
 
 v1.2.0 is backwards compatible (bump, `go mod tidy && go mod vendor`). New:

@@ -28,6 +28,7 @@ const Timeout = 5 * time.Second
 const (
 	maxPersonBytes = 64 << 10
 	maxPhotoBytes  = 2 << 20
+	maxListBytes   = 1 << 20
 )
 
 var idPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$`)
@@ -116,6 +117,31 @@ func (c *Client) ByID(ctx context.Context, id string) (Person, error) {
 	return c.person(ctx, "/internal/v1/people/"+url.PathEscape(id))
 }
 
+// People returns everyone directory grants this app, kid profiles included, for apps that
+// need the whole list (a service whose callers name people, a picker). Each has a Role.
+func (c *Client) People(ctx context.Context) ([]Person, error) {
+	body, err := c.get(ctx, "/internal/v1/people", maxListBytes)
+	if err != nil {
+		return nil, err
+	}
+	var list []wire
+	if err := json.Unmarshal(body, &list); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrUnavailable, err)
+	}
+	people := make([]Person, 0, len(list))
+	for _, w := range list {
+		p, err := w.person()
+		if errors.Is(err, ErrUnknown) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		people = append(people, p)
+	}
+	return people, nil
+}
+
 // wire is directory's answer: roles holds the calling app's role only.
 type wire struct {
 	ID         string            `json:"id"`
@@ -137,6 +163,10 @@ func (c *Client) person(ctx context.Context, path string) (Person, error) {
 	if err := json.Unmarshal(body, &w); err != nil {
 		return Person{}, fmt.Errorf("%w: %v", ErrUnavailable, err)
 	}
+	return w.person()
+}
+
+func (w wire) person() (Person, error) {
 	if !idPattern.MatchString(w.ID) {
 		return Person{}, fmt.Errorf("%w: answer without a valid id", ErrUnavailable)
 	}

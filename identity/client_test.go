@@ -23,6 +23,8 @@ func fakeDirectory(t *testing.T) (*httptest.Server, *[]string) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
+		case "/internal/v1/people":
+			_, _ = w.Write([]byte(`[{"id":"alice","name":"Alice","group":"owners","emails":["a@example.org"],"roles":{"paper":"owner"},"actsFor":["emma"]},{"id":"emma","name":"Emma","group":"kids","kid":true,"roles":{"paper":"member"}},{"id":"odd","name":"Odd","roles":{}}]`))
 		case "/internal/v1/people/by-email":
 			if strings.EqualFold(r.URL.Query().Get("email"), "alice+x@example.org") {
 				_, _ = w.Write([]byte(`{"id":"alice","name":"Alice","group":"owners","emails":["alice+x@example.org"],"pictureUrl":"/internal/v1/people/alice/photo?v=7","kid":false,"roles":{"paper":"owner"},"actsFor":["emma"]}`))
@@ -81,6 +83,19 @@ func TestClientReadsDirectory(t *testing.T) {
 	}
 	if _, err := c.Photo(ctx, Person{PictureURL: "https://evil.example/internal/v1/people/x"}); !errors.Is(err, ErrUnknown) {
 		t.Fatalf("absolute photo URL: %v", err)
+	}
+}
+
+func TestClientListsTheAppsPeople(t *testing.T) {
+	srv, _ := fakeDirectory(t)
+	c, _ := NewClient(Config{URL: srv.URL, Key: testKey})
+	people, err := c.People(context.Background())
+	if err != nil || len(people) != 2 || people[0].ID != "alice" || !people[1].Kid || people[1].ActsFor == nil {
+		t.Fatalf("%+v %v", people, err)
+	}
+	srv.Close()
+	if _, err := c.People(context.Background()); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("closed: %v", err)
 	}
 }
 

@@ -4,6 +4,7 @@ package identitytest
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 
@@ -93,6 +94,24 @@ func (d *Directory) ByID(_ context.Context, id string) (identity.Person, error) 
 		return identity.Person{}, identity.ErrUnknown
 	}
 	return granted(p)
+}
+
+// People returns everyone with a Role, sorted by id, like identity.Client.People.
+func (d *Directory) People(_ context.Context) ([]identity.Person, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.calls++
+	if d.unavailable {
+		return nil, fmt.Errorf("%w: identitytest", identity.ErrUnavailable)
+	}
+	out := []identity.Person{}
+	for _, p := range d.people {
+		if g, err := granted(p); err == nil {
+			out = append(out, g)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
 }
 
 func granted(p identity.Person) (identity.Person, error) {
