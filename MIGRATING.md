@@ -10,6 +10,12 @@ a request calls `event.stopImmediatePropagation()`). The new worker caches only 
 `/assets/`, skips `/pwa/`, and drops the older caches of its scope on activation. Pass the app name
 to `registerServiceWorker({ name: '<app>' })` in `src/main.tsx` to name the cache.
 
+Optional adoptions (nothing breaks without them):
+
+- Readiness: mount `GET /readyz` with `server.Ready(dbPing)` next to `/healthz` and point the
+  chart's `readinessProbe` at `/readyz` (liveness stays on `/healthz`). Drop any checks passed to
+  `server.Health`; they were always ignored.
+
 # Migrating to v1.0.0 (platform-upstream)
 
 v1.0.0 is the first release under the neutral module path. It contains everything of

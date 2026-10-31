@@ -84,10 +84,11 @@ examples.
 The default server limits are 5 seconds for headers, 20 seconds for reads and writes, 60 seconds
 idle, 32 KiB for headers, and 5 seconds for graceful shutdown. Use
 `RunWithShutdownTimeout`/`ServeWithShutdownTimeout` only when a demonstrated application lifecycle
-needs a different positive shutdown deadline. Dependency checks do not belong in the shared health
-handler; applications may expose a separate readiness endpoint when a real consumer requires one.
-The legacy `Health(check)` call shape still compiles for `v0.1.0` consumers, but checks are ignored;
-use an application-owned readiness route if dependency state genuinely needs to affect routing.
+needs a different positive shutdown deadline. `Health` is the shallow liveness
+endpoint (`/healthz`); dependency checks belong in `Ready` (`/readyz`), whose 503 names no check.
+Keep readiness checks local (a database ping): a shared dependency that fails would take every pod
+out of the service at once. The legacy `Health(check)` call shape still compiles for `v0.1.0`
+consumers, but the checks are ignored and passing any is deprecated.
 
 Cloudflare mode verifies one bounded `Cf-Access-Jwt-Assertion`, RS256, issuer, audience, expiry,
 issued-at, and subject against a bounded/cached JWKS fetch. Access is an owner gate, so there is no

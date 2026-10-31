@@ -149,3 +149,49 @@ func TestServeRejectsInvalidShutdownTimeout(t *testing.T) {
 		t.Fatal("ServeWithShutdownTimeout accepted zero timeout")
 	}
 }
+
+func TestReady(t *testing.T) {
+	failing := func(context.Context) error { return errors.New("db at /data/secret.sqlite is locked") }
+	passing := func(context.Context) error { return nil }
+	bounded := func(ctx context.Context) error {
+		if _, ok := ctx.Deadline(); !ok {
+			return errors.New("no deadline")
+		}
+		return nil
+	}
+	for name, test := range map[string]struct {
+		checks []func(context.Context) error
+		code   int
+	}{
+		"no checks":    {nil, http.StatusOK},
+		"all pass":     {[]func(context.Context) error{passing, passing}, http.StatusOK},
+		"one fails":    {[]func(context.Context) error{passing, failing}, http.StatusServiceUnavailable},
+		"nil check":    {[]func(context.Context) error{nil}, http.StatusServiceUnavailable},
+		"panic":        {[]func(context.Context) error{func(context.Context) error { panic("boom") }}, http.StatusServiceUnavailable},
+		"has deadline": {[]func(context.Context) error{bounded}, http.StatusOK},
+	} {
+		w := httptest.NewRecorder()
+		Ready(test.checks...).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+		want := `{"ok":true}` + "\n"
+		if test.code != http.StatusOK {
+			want = `{"ok":false}` + "\n"
+		}
+		if w.Code != test.code || w.Body.String() != want || w.Header().Get("Cache-Control") != "no-store" {
+			t.Errorf("%s: %d %q %#v", name, w.Code, w.Body.String(), w.Header())
+		}
+	}
+}
+
+func TestReadyBoundsAHangingCheck(t *testing.T) {
+	release := make(chan struct{})
+	defer close(release)
+	hanging := func(context.Context) error { <-release; return nil } // ignores its context
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	w := httptest.NewRecorder()
+	Ready(hanging).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/readyz", nil).WithContext(ctx))
+	if w.Code != http.StatusServiceUnavailable || time.Since(start) > ReadyCheckTimeout {
+		t.Fatalf("hanging check: %d after %v", w.Code, time.Since(start))
+	}
+}

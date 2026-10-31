@@ -47,6 +47,9 @@ func Open(ctx context.Context, path string) (*Store, error) {
 
 func (s *Store) Close() error { return s.db.Close() }
 
+// Ping reports whether the database answers; it backs the readiness probe (/readyz).
+func (s *Store) Ping(ctx context.Context) error { return s.db.PingContext(ctx) }
+
 // Notes returns all notes, newest first.
 func (s *Store) Notes(ctx context.Context) ([]Note, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT id, text, created_at FROM notes ORDER BY id DESC`)

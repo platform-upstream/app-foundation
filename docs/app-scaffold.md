@@ -34,9 +34,10 @@ It yields the module path `github.com/<org>/<name>`, the hostname `<name>.<domai
   gofmt, vet and tests against `vendor/`, distroless static non-root runtime. Cache mounts end in
   `-${CACHE_SCOPE}` (CI contract).
 - Chart: chart-owned image, RollingUpdate with a native `preStop` sleep (Kubernetes 1.30+), PVC
-  with `helm.sh/resource-policy: keep`, read-only root filesystem, UID 65532, shallow `/healthz`
-  probes, Access values (`cfTeamDomain`, `cfAccessAud`, `cfAccessServiceTokens`).
-- Routes: security headers → `/healthz` → `web.PublicFiles` (`/pwa/` without a session) →
+  with `helm.sh/resource-policy: keep`, read-only root filesystem, UID 65532, readiness on
+  `/readyz` (database ping), liveness on `/healthz`, Access values (`cfTeamDomain`, `cfAccessAud`,
+  `cfAccessServiceTokens`).
+- Routes: security headers → `/healthz`, `/readyz` → `web.PublicFiles` (`/pwa/` without a session) →
   Access middleware → `/api/` (same-origin mutations) and the SPA.
 - Migrations are additive, because old and new pod overlap during a release.
 

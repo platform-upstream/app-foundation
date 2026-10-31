@@ -68,9 +68,10 @@ spec:
             preStop:
               sleep:
                 seconds: 8
+          # Readiness: the database answers (server.Ready). Liveness stays shallow (server.Health).
           readinessProbe:
             httpGet:
-              path: /healthz
+              path: /readyz
               port: http
             periodSeconds: 5
           livenessProbe:

@@ -65,8 +65,9 @@ func run() error {
 }
 
 // newHandler composes the routes in the foundation's order: security headers, the public shallow
-// /healthz, the public /pwa/ files (manifest and icons, see web.PublicPrefix), then Cloudflare
-// Access for everything else, static files included.
+// /healthz (liveness) and /readyz (readiness: the database answers), the public /pwa/ files
+// (manifest and icons, see web.PublicPrefix), then Cloudflare Access for everything else, static
+// files included.
 func newHandler(st *store.Store, auth *access.Authenticator, origin string) (http.Handler, error) {
 	if auth == nil {
 		return nil, errors.New("authenticator is required")
@@ -84,6 +85,7 @@ func newHandler(st *store.Store, auth *access.Authenticator, origin string) (htt
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /healthz", server.Health())
+	mux.Handle("GET /readyz", server.Ready(st.Ping))
 	mux.Handle("/", web.PublicFiles(spa, gated))
 	return securityHeaders(mux), nil
 }
