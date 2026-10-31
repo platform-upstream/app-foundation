@@ -85,6 +85,6 @@ Access values (the chart refuses to render without them), on this platform:
 cfTeamDomain: __ACCESS_TEAM__
 cfAccessAud: <tofu output -json app_auds>
 directory:
-  url: http://directory.<namespace>.svc:8080
+  url: http://<directory release>.<namespace>.svc:8080 (Service named after the release)
   existingSecret: <Secret with directory-key>
 ```

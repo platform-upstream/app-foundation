@@ -35,7 +35,7 @@ var idPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$`)
 
 // Config locates directory's identity API.
 type Config struct {
-	// URL is directory's in-cluster base URL, such as http://directory.directory-prod.svc:8080.
+	// URL is directory's in-cluster base URL, such as http://directory-prod.directory-prod.svc:8080.
 	URL string
 	// Key is this app's identity API key (at least access.MinInternalKeyLength characters); the
 	// same value is directory's DIRECTORY_CALLER_KEY_<APP>.

@@ -19,7 +19,7 @@ cfAccessServiceTokens: ""
 # ExternalSecret) holds this app's key under directory-key; directory lists the app in its
 # `callers` and its namespace in `networkPolicy.callerNamespaces`.
 directory:
-  # http://directory.<namespace>.svc:8080
+  # http://<directory release>.<namespace>.svc:8080 (Service named after the release)
   url: ""
   existingSecret: ""
 
