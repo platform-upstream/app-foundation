@@ -20,8 +20,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
-          check-latest: true
+          go-version: stable
       - name: gofmt
         run: test -z "$(gofmt -l $(git ls-files '*.go'))" || { gofmt -l $(git ls-files '*.go'); exit 1; }
       - run: go vet ./...
@@ -29,6 +28,18 @@ jobs:
       - run: go test -race ./...
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  # The module promises the go version in go.mod to its consumers: build and test with exactly that
+  # (-short skips the scaffold build, whose generated app needs a newer Go).
+  minimum-go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test -short ./...
 
   # The generated app the way CI on a platform builds it: frontend install, typecheck and build,
   # then the app's own Dockerfile (registry check, gofmt, vet, tests, distroless image) and a
