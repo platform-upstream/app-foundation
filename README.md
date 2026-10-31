@@ -107,14 +107,19 @@ refused, so the public hostname never reaches them. A key shorter than 32 bytes,
 included, closes the route. Authorization policy, which callers exist, their NetworkPolicies,
 rejection headers/copy, and CSP remain application-owned.
 
-SQLite defaults to WAL, foreign keys, a five-second busy timeout, a 4 MiB page cache, and one
-open/idle connection. `OpenReadOnly` accepts an ordinary existing path, adds `mode=ro`, and enforces
+SQLite defaults to WAL, foreign keys, a five-second busy timeout, a 4 MiB page cache, one
+open/idle connection, and `BEGIN IMMEDIATE` transactions (`_txlock=immediate`): old and new pod share
+the file during a rolling update, and a deferred transaction that reads, sees the other process
+commit, then writes fails with `SQLITE_BUSY_SNAPSHOT`, which no busy timeout cures. Immediate
+transactions take the write lock up front and wait instead. `sql.TxOptions{ReadOnly: true}` stays
+deferred; a `_txlock` in a `file:` DSN wins. `OpenReadOnly` accepts an ordinary existing path, adds `mode=ro`, and enforces
 `query_only`; `Immutable` is reserved for isolated self-contained snapshots with no live WAL.
 Migration files use `<version>_<lowercase-name>.sql`; applied files are forward-only and may not be
 removed or renamed. Each pending migration and its state row commit in one transaction. `Snapshot`
 uses SQLite's online backup API to capture committed live/WAL content consistently without changing
 implicit row IDs, verifies integrity, syncs the result, and atomically publishes only to a
-destination that does not exist. Callers own
+destination that does not exist (hard link; where the filesystem has none, an exclusive placeholder
+the copy is renamed over). Callers own
 snapshot retention and must supply a context deadline. Schemas, migration SQL, portable exports,
 restore policy, and destructive-migration approval remain application-owned.
 

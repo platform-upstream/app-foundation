@@ -10,6 +10,11 @@ a request calls `event.stopImmediatePropagation()`). The new worker caches only 
 `/assets/`, skips `/pwa/`, and drops the older caches of its scope on activation. Pass the app name
 to `registerServiceWorker({ name: '<app>' })` in `src/main.tsx` to name the cache.
 
+Behaviour change: `sqlite.Open` now begins transactions `IMMEDIATE`. Two processes on one database
+no longer fail with `SQLITE_BUSY_SNAPSHOT`; a second writer waits up to the busy timeout instead.
+Read-only transactions that should not take the write lock use `sql.TxOptions{ReadOnly: true}`.
+`sqlite.Snapshot` also works on filesystems without hard links.
+
 Optional adoptions (nothing breaks without them):
 
 - Readiness: mount `GET /readyz` with `server.Ready(dbPing)` next to `/healthz` and point the

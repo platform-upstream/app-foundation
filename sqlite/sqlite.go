@@ -148,12 +148,20 @@ func pragmaDSN(path string, options Options, readOnly bool) string {
 		pragmas += "&_pragma=query_only(1)"
 	} else {
 		pragmas = "_pragma=journal_mode(WAL)&" + pragmas
+		// BEGIN IMMEDIATE: a transaction takes the write lock when it starts, so a second process on
+		// the same file (old and new pod during a rolling update) waits out busy_timeout instead of
+		// failing with SQLITE_BUSY_SNAPSHOT when its read snapshot went stale before its first write.
+		// sql.TxOptions{ReadOnly: true} still begins a deferred transaction.
+		if !strings.Contains(path, "_txlock=") {
+			pragmas += "&_txlock=immediate"
+		}
 	}
 	return path + separator + pragmas
 }
 
 // Snapshot writes a consistent online-backup copy of the live database to a new path. It never
-// overwrites an existing destination. The caller must provide a context with an appropriate
+// overwrites an existing destination. It publishes the finished copy with a hard link, or, where the
+// filesystem has none, by reserving the destination exclusively and renaming the copy over it. The caller must provide a context with an appropriate
 // deadline because snapshot duration depends on database size and concurrent transactions.
 func Snapshot(ctx context.Context, db *sql.DB, destination string) error {
 	if db == nil {
@@ -203,7 +211,7 @@ func Snapshot(ctx context.Context, db *sql.DB, destination string) error {
 	if err := file.Close(); err != nil {
 		return fmt.Errorf("close SQLite snapshot: %w", err)
 	}
-	if err := os.Link(temporaryPath, absolute); err != nil {
+	if err := publish(temporaryPath, absolute); err != nil {
 		return fmt.Errorf("publish SQLite snapshot: %w", err)
 	}
 	directory, err := os.Open(parent)
@@ -216,6 +224,32 @@ func Snapshot(ctx context.Context, db *sql.DB, destination string) error {
 	}
 	if err := directory.Close(); err != nil {
 		return fmt.Errorf("close SQLite snapshot directory: %w", err)
+	}
+	return nil
+}
+
+// link is os.Link, replaceable in tests to simulate a filesystem without hard links.
+var link = os.Link
+
+// publish moves the finished snapshot at temporary to destination without replacing an existing
+// file: a hard link where the filesystem supports it, else an exclusive placeholder that the
+// snapshot is renamed over (readers may briefly see the empty placeholder, never a partial copy).
+func publish(temporary, destination string) error {
+	err := link(temporary, destination)
+	if err == nil || errors.Is(err, fs.ErrExist) {
+		return err
+	}
+	placeholder, createErr := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if createErr != nil {
+		return errors.Join(err, createErr)
+	}
+	if closeErr := placeholder.Close(); closeErr != nil {
+		_ = os.Remove(destination)
+		return errors.Join(err, closeErr)
+	}
+	if renameErr := os.Rename(temporary, destination); renameErr != nil {
+		_ = os.Remove(destination)
+		return errors.Join(err, renameErr)
 	}
 	return nil
 }

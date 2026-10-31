@@ -256,3 +256,141 @@ func openTestDB(t *testing.T) *sql.DB {
 	t.Cleanup(func() { _ = db.Close() })
 	return db
 }
+
+// Two handles on one file stand in for the old and the new pod during a rolling update. A
+// transaction that reads and then writes must not fail with SQLITE_BUSY_SNAPSHOT when the other
+// process commits in between: with BEGIN IMMEDIATE the other writer waits instead.
+func TestOverlappingProcessesDoNotFailWithBusySnapshot(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "shared.sqlite")
+	ctx := context.Background()
+	oldPod, err := Open(ctx, path, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer oldPod.Close()
+	newPod, err := Open(ctx, path, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer newPod.Close()
+	if _, err := oldPod.Exec(`CREATE TABLE counter (n INTEGER NOT NULL); INSERT INTO counter VALUES (0)`); err != nil {
+		t.Fatal(err)
+	}
+
+	tx, err := oldPod.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	if err := tx.QueryRow(`SELECT n FROM counter`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	other := make(chan error, 1)
+	go func() {
+		_, err := newPod.Exec(`UPDATE counter SET n = n + 10`)
+		other <- err
+	}()
+	select {
+	case err := <-other:
+		t.Fatalf("the other process wrote during an immediate transaction: %v", err)
+	case <-time.After(200 * time.Millisecond):
+	}
+	if _, err := tx.Exec(`UPDATE counter SET n = ?`, n+1); err != nil {
+		t.Fatalf("write after read: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-other; err != nil {
+		t.Fatalf("the waiting writer failed: %v", err)
+	}
+	if err := oldPod.QueryRow(`SELECT n FROM counter`).Scan(&n); err != nil || n != 11 {
+		t.Fatalf("n = %d, error = %v", n, err)
+	}
+
+	// Read-only transactions stay deferred and do not take the write lock.
+	readTx, err := oldPod.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer readTx.Rollback()
+	if err := readTx.QueryRow(`SELECT n FROM counter`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := newPod.Exec(`UPDATE counter SET n = 0`); err != nil {
+		t.Fatalf("a read-only transaction blocked a writer: %v", err)
+	}
+}
+
+// The failure the default avoids: a deferred transaction whose snapshot went stale cannot write,
+// and busy_timeout does not help.
+func TestDeferredTransactionFailsAfterConcurrentCommit(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "shared.sqlite")
+	ctx := context.Background()
+	oldPod, err := Open(ctx, "file:"+filepath.ToSlash(path)+"?_txlock=deferred", Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer oldPod.Close()
+	newPod, err := Open(ctx, path, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer newPod.Close()
+	if _, err := newPod.Exec(`CREATE TABLE counter (n INTEGER NOT NULL); INSERT INTO counter VALUES (0)`); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := oldPod.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	var n int
+	if err := tx.QueryRow(`SELECT n FROM counter`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := newPod.Exec(`UPDATE counter SET n = n + 10`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(`UPDATE counter SET n = ?`, n+1); err == nil {
+		t.Fatal("a stale deferred transaction wrote; the immediate default would be unnecessary")
+	}
+}
+
+func TestSnapshotWithoutHardLinks(t *testing.T) {
+	original := link
+	link = func(string, string) error {
+		return &os.LinkError{Op: "link", Err: errors.New("operation not supported")}
+	}
+	defer func() { link = original }()
+
+	dir := t.TempDir()
+	db, err := Open(context.Background(), filepath.Join(dir, "live.sqlite"), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`CREATE TABLE items (id TEXT PRIMARY KEY); INSERT INTO items VALUES ('kept')`); err != nil {
+		t.Fatal(err)
+	}
+	destination := filepath.Join(dir, "snapshots", "snapshot.sqlite")
+	if err := Snapshot(context.Background(), db, destination); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := OpenReadOnly(context.Background(), destination, Options{Immutable: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer snapshot.Close()
+	var id string
+	if err := snapshot.QueryRow(`SELECT id FROM items`).Scan(&id); err != nil || id != "kept" {
+		t.Fatalf("snapshot id = %q, error = %v", id, err)
+	}
+	entries, err := os.ReadDir(filepath.Dir(destination))
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("snapshot directory holds %v (%v), want only the snapshot", entries, err)
+	}
+	if err := Snapshot(context.Background(), db, destination); err == nil {
+		t.Fatal("Snapshot overwrote an existing destination")
+	}
+}
