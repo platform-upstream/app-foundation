@@ -1,0 +1,18 @@
+# Releases itself: after a green ci run on main, tag the next version from the commits'
+# `Release: none|patch|minor|major` trailers (default patch; docs-only changes release nothing;
+# a major becomes a draft) and start mirror.yml with the tag. Shared: platform-upstream/workflows.
+name: release
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+jobs:
+  release:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    uses: platform-upstream/workflows/.github/workflows/release.yml@main
+    permissions:
+      contents: write
+      actions: write
+    with:
+      sha: ${{ github.event.workflow_run.head_sha }}
