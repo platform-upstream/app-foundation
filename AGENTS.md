@@ -1,21 +1,25 @@
 # app-foundation
 
-Small, versioned Go primitives shared by the first-party applications of the platforms built on platform-upstream. This repository is a
-toolkit, not an application framework.
+Small Go primitives for the platforms' first-party apps; a toolkit, not a framework. Usage: `go doc <pkg>` (examples in `example_test.go`).
 
-- Keep packages independent and usable with `net/http` and `database/sql` directly.
-- Extract only behavior demonstrated by a consumer. Do not add domain types, route registries,
-  repositories, dependency injection, an ORM, job DSLs, prompts, or app-owned copy.
-- Application handlers, schemas, migrations, authorization policy, CSP, user-facing messages, and
-  frontend design remain in each application.
-- Cloudflare Access local mode must fail closed unless the listener is literal `127.0.0.1` and the
-  actual request peer is loopback.
-- SQLite defaults to one open/idle connection. Migrations are ordered, embedded, forward-only, and
-  transactional.
-- Tests must cover changed behavior. Run `go test ./...`, `go vet ./...`, and `go test -race ./...`.
-- Commit directly to `main` (small, green). SemVer tags from v1.0.0; a breaking change needs a new
-  major agreed by both platform owners. Consumers pin an exact tag.
-- Nothing platform-specific: no org, domain, Access team, registry or secret path (examples use
-  example.org and acme).
-- The repository is private. Consumers may vendor it for secret-free container builds; never put a
-  GitHub credential in a Dockerfile, image layer, module URL, or committed configuration.
+- `access`: Cloudflare Access JWT, fail-closed local mode, `ConfigFromEnv`, bearer guards `Internal`/`Remote`.
+- `agentkit`: shared parts of an app's MCP tools (caller ceilings, references, runs, cut results).
+- `httpx`: request IDs, bounded JSON decoding, `{"error":"..."}` envelope, API 404.
+- `server`: bounded `http.Server`, `Health` (/healthz), `Ready` (/readyz), graceful shutdown.
+- `sqlite`: bounded pure-Go SQLite (WAL, BEGIN IMMEDIATE), read-only, snapshots, forward-only migrations.
+- `web`: embedded SPA with cache rules, `PublicFiles` for /pwa/, security `Headers`.
+- `llm`, `memory`, `push`: clients; `frontendregistry`: frontend source installer; `appscaffold`: app generator.
+
+Composition, outermost first: `web.Headers` → probes → `access.Internal` routes → `web.PublicFiles(spa, gated)` → Access → `/api/`, SPA.
+
+Rules: no platform names (org, domain, Access team, registry, secret path; examples use example.org,
+acme); extract only what a consumer proved; no app object, router, ORM, DI; schemas, CSP, policy and copy
+stay in apps; local auth only on literal `127.0.0.1` with a loopback peer; never `web.Public` alone as a gate.
+
+Managed in apps: registry modules `api`, `pwa`, `pwa-shell` (`check`/`sync`); `public/sw.js` is a template
+copy (apps extend `sw-app.js`); everything else the scaffold writes belongs to the app.
+
+Change: tests for changed behaviour; in WSL `go vet ./... && go test -race ./...` (Node runs the sw.js test);
+commit to `main` without attribution; CI green (go, minimum-go, scaffold). Release: SemVer (breaking = new
+major agreed by both platform owners), MIGRATING.md entry, `git tag -a vX.Y.Z`, `gh release create vX.Y.Z
+--verify-tag --generate-notes`. The repo is private: never put a GitHub credential in a build or config.

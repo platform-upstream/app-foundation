@@ -9,7 +9,7 @@ app. Generation rejects symlink parents and uses root-confined atomic writes.
 
 ```bash
 go env -w GOPRIVATE=github.com/platform-upstream/*
-go run github.com/platform-upstream/app-foundation/cmd/app-scaffold@v1.0.0 \
+go run github.com/platform-upstream/app-foundation/cmd/app-scaffold@v1.1.0 \
   -platform ../platform-config/platform.json -target ./notes -name notes -title "Notes"
 cd notes && go mod tidy && go mod vendor
 ```
