@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/platform-upstream/app-foundation/access"
 	"github.com/platform-upstream/app-foundation/httpx"
 	"github.com/platform-upstream/app-foundation/identity"
 )
@@ -64,8 +65,18 @@ type Handler struct {
 	db     *sql.DB
 	photos Photos
 	prefix string
-	once   sync.Once
-	err    error
+	lookup identity.Resolver
+	// anyCaller: serve a profile from the Access e-mail even without a lookup.
+	anyCaller bool
+	once      sync.Once
+	err       error
+}
+
+// FromAccess serves a profile to any caller access.Middleware verified (named after the e-mail),
+// for apps without directory; Lookup adds the directory person.
+func (h *Handler) FromAccess() *Handler {
+	h.anyCaller = true
+	return h
 }
 
 // New returns the handler; photos may be nil.
@@ -86,8 +97,43 @@ func (h *Handler) init(ctx context.Context) error {
 	return h.err
 }
 
+// Lookup lets the handler serve apps that do not run identity.Middleware yet (they gate by the
+// Access e-mail themselves): the person is looked up by the signed-in e-mail for display only. A
+// person directory does not know (or no directory) still gets a profile, named after the e-mail.
+// The lookup never admits anyone: the app's own gate stays in front.
+func (h *Handler) Lookup(r identity.Resolver) *Handler {
+	h.lookup = r
+	return h
+}
+
+func (h *Handler) caller(r *http.Request) (identity.Person, bool) {
+	if p, ok := identity.From(r.Context()); ok {
+		return p, true
+	}
+	if h.lookup == nil && !h.anyCaller {
+		return identity.Person{}, false
+	}
+	c, ok := access.CallerFrom(r.Context())
+	switch {
+	case !ok:
+		return identity.Person{}, false
+	case c.Local:
+		return identity.Person{ID: "local", Name: "Local", Group: "owners", Role: "owner", Spaces: []identity.Space{{Kind: identity.SpacePerson, ID: "local"}}}, true
+	case c.Email == "":
+		return identity.Person{}, false
+	}
+	email := strings.ToLower(strings.TrimSpace(c.Email))
+	if h.lookup != nil {
+		if p, err := h.lookup.ByEmail(r.Context(), email); err == nil {
+			return p, true
+		}
+	}
+	name, _, _ := strings.Cut(email, "@")
+	return identity.Person{ID: email, Name: name, Emails: []string{email}, Role: "member", Spaces: []identity.Space{{Kind: identity.SpacePerson, ID: email}}}, true
+}
+
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	person, ok := identity.From(r.Context())
+	person, ok := h.caller(r)
 	if !ok {
 		_ = httpx.WriteError(w, http.StatusUnauthorized, "Please sign in again.")
 		return
