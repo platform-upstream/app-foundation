@@ -85,6 +85,12 @@ the adult. `Cache` keeps a person fresh for a minute (a removed grant takes effe
 serves a known person up to an hour longer while directory is unavailable (never an unknown one),
 and shares concurrent lookups. Roles beyond owner/member/viewer and what they allow stay in apps.
 
+**Backups.** A file copy of a live SQLite database (Velero's file system backup) can mix pages
+from different moments. With `APP_SNAPSHOT_DIR` set (app-chart sets it to `<data>/.snapshots` for
+apps with persistence), every database opened writable also writes an integrity-checked online
+copy there every `APP_SNAPSHOT_INTERVAL` (1h) and keeps `APP_SNAPSHOT_KEEP` (2): the backup of the
+volume always holds a copy that opens cleanly (`sqlite/snapshots.go`, restore steps there).
+
 **SQLite.** One open connection, WAL, a busy timeout, and `BEGIN IMMEDIATE` transactions: old and new
 pod share the file during a rolling update, and a deferred transaction that reads, sees the other
 process commit, then writes fails with `SQLITE_BUSY_SNAPSHOT`, which no busy timeout cures.

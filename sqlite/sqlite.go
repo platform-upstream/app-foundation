@@ -44,7 +44,8 @@ type Migration struct {
 }
 
 // Open creates the parent directory, opens SQLite with explicit pragmas, verifies connectivity,
-// and bounds the connection pool. The caller owns Close.
+// and bounds the connection pool. The caller owns Close. With APP_SNAPSHOT_DIR set it also starts
+// periodic backup snapshots of the database (snapshots.go).
 func Open(ctx context.Context, path string, options Options) (*sql.DB, error) {
 	if options.Immutable {
 		return nil, errors.New("immutable mode requires OpenReadOnly")
@@ -112,6 +113,9 @@ func open(ctx context.Context, path string, options Options, readOnly bool) (*sq
 			}
 			return nil, errors.New("SQLite query-only mode is disabled")
 		}
+	} else if err := startSnapshotsFromEnv(db, path); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("SQLite snapshots: %w", err)
 	}
 	return db, nil
 }
