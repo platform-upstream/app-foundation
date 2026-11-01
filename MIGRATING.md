@@ -1,3 +1,13 @@
+# Migrating to v1.4.0
+
+Compatible (bump, `go mod tidy && go mod vendor`). New: periodic backup snapshots of every
+writable SQLite database, off unless `APP_SNAPSHOT_DIR` is set. app-chart (0.7+) sets
+`APP_SNAPSHOT_DIR=<persistence.mountPath>/.snapshots` for apps with persistence; nothing to change
+in code. A wrong `APP_SNAPSHOT_INTERVAL` (not a duration, under 1m) or `APP_SNAPSHOT_KEEP` makes
+`sqlite.Open` fail. Explicit control: `sqlite.StartSnapshots(ctx, db, path, opts)`.
+Restore: scale the app to 0, copy the newest `<db>-<hash>-<time>.sqlite` over the database file,
+delete its `-wal` and `-shm`, scale up.
+
 # Migrating to v1.3.0
 
 Compatible: `identity.Client.People(ctx)` lists everyone directory grants the app (kid profiles
