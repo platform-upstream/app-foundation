@@ -39,6 +39,9 @@ func (d *Directory) Set(p identity.Person) {
 	if p.ActsFor == nil {
 		p.ActsFor = []string{}
 	}
+	if len(p.Spaces) == 0 || p.Spaces[0] != (identity.Space{Kind: identity.SpacePerson, ID: p.ID}) {
+		p.Spaces = append([]identity.Space{{Kind: identity.SpacePerson, ID: p.ID}}, p.Spaces...)
+	}
 	d.people[p.ID] = p
 }
 

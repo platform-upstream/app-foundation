@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -27,7 +28,7 @@ func fakeDirectory(t *testing.T) (*httptest.Server, *[]string) {
 			_, _ = w.Write([]byte(`[{"id":"alice","name":"Alice","group":"owners","emails":["a@example.org"],"roles":{"paper":"owner"},"actsFor":["emma"]},{"id":"emma","name":"Emma","group":"kids","kid":true,"roles":{"paper":"member"}},{"id":"odd","name":"Odd","roles":{}}]`))
 		case "/internal/v1/people/by-email":
 			if strings.EqualFold(r.URL.Query().Get("email"), "alice+x@example.org") {
-				_, _ = w.Write([]byte(`{"id":"alice","name":"Alice","group":"owners","emails":["alice+x@example.org"],"pictureUrl":"/internal/v1/people/alice/photo?v=7","kid":false,"roles":{"paper":"owner"},"actsFor":["emma"]}`))
+				_, _ = w.Write([]byte(`{"id":"alice","name":"Alice","group":"owners","emails":["alice+x@example.org"],"pictureUrl":"/internal/v1/people/alice/photo?v=7","kid":false,"roles":{"paper":"owner"},"actsFor":["emma"],"via":"family","spaces":[{"kind":"person","id":"alice"},{"kind":"family","id":"home"},{"kind":"family","id":"Bad Id"},{"kind":"team","id":"x"}]}`))
 				return
 			}
 			w.WriteHeader(http.StatusNotFound)
@@ -153,5 +154,30 @@ func TestConfigFromEnv(t *testing.T) {
 	}
 	if _, err := NewClient(Config{URL: "http://d", Key: "short"}); err == nil {
 		t.Error("accepted short key")
+	}
+}
+
+func TestClientReadsSpaces(t *testing.T) {
+	srv, _ := fakeDirectory(t)
+	c, err := NewClient(Config{URL: srv.URL, Key: testKey})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	alice, err := c.ByEmail(ctx, "alice+x@example.org")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Own space first, family spaces kept, malformed entries dropped.
+	if want := []Space{{SpacePerson, "alice"}, {SpaceFamily, "home"}}; !reflect.DeepEqual(alice.Spaces, want) || alice.Via != "family" {
+		t.Fatalf("alice %+v %q", alice.Spaces, alice.Via)
+	}
+	if !alice.InSpace(Space{SpaceFamily, "home"}) || alice.InSpace(Space{SpaceFamily, "other"}) || !reflect.DeepEqual(alice.FamilySpaces(), []string{"home"}) {
+		t.Fatal("InSpace/FamilySpaces")
+	}
+	// An older directory without spaces: the own space only.
+	emma, _ := c.ByID(ctx, "emma")
+	if !reflect.DeepEqual(emma.Spaces, []Space{{SpacePerson, "emma"}}) {
+		t.Fatalf("emma %+v", emma.Spaces)
 	}
 }
