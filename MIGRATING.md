@@ -1,3 +1,10 @@
+# Migrating to v1.6.0
+
+Compatible. `profile.Handler.FromAccess()` and `.Lookup(resolver)` serve `/api/me` to apps that
+do not run `identity.Middleware` yet: the person is looked up by the Access e-mail for display only
+(photo, name), and a person directory does not know still gets a profile named after the e-mail.
+The app's own gate stays in front; the lookup admits nobody.
+
 # Migrating to v1.5.0
 
 Compatible (bump, `go mod tidy && go mod vendor`). New:

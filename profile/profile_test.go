@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/platform-upstream/app-foundation/access"
 	"github.com/platform-upstream/app-foundation/identity"
 	"github.com/platform-upstream/app-foundation/sqlite"
 )
@@ -109,5 +110,53 @@ func TestSettingsArePerPerson(t *testing.T) {
 	h.ServeHTTP(rec, req)
 	if rec.Code != 401 {
 		t.Fatalf("no person %d", rec.Code)
+	}
+}
+
+type dir map[string]identity.Person
+
+func (d dir) ByEmail(_ context.Context, e string) (identity.Person, error) {
+	if p, ok := d[e]; ok {
+		return p, nil
+	}
+	return identity.Person{}, identity.ErrUnknown
+}
+func (d dir) ByID(context.Context, string) (identity.Person, error) {
+	return identity.Person{}, identity.ErrUnknown
+}
+
+// Apps without identity.Middleware: the directory person by the Access e-mail, else one named
+// after the e-mail; nobody without an Access caller.
+func TestLookupByAccessEmail(t *testing.T) {
+	h := setup(t).Lookup(dir{"alice@example.org": alice}).FromAccess()
+	get := func(c *access.Caller) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+		if c != nil {
+			req = req.WithContext(access.NewContext(req.Context(), *c))
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+	var m Me
+	_ = json.Unmarshal(get(&access.Caller{Subject: "s", Email: "Alice@Example.org"}).Body.Bytes(), &m)
+	if m.ID != "alice" || m.Photo == "" {
+		t.Fatalf("alice %+v", m)
+	}
+	_ = json.Unmarshal(get(&access.Caller{Subject: "s", Email: "bob@example.org"}).Body.Bytes(), &m)
+	if m.ID != "bob@example.org" || m.Name != "bob" || m.Photo != "" {
+		t.Fatalf("bob %+v", m)
+	}
+	if rec := get(nil); rec.Code != 401 {
+		t.Fatalf("no caller %d", rec.Code)
+	}
+	// Without FromAccess and Lookup, only identity.Middleware's person counts.
+	if rec := httptest.NewRecorder(); true {
+		req := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+		req = req.WithContext(access.NewContext(req.Context(), access.Caller{Subject: "s", Email: "bob@example.org"}))
+		setup(t).ServeHTTP(rec, req)
+		if rec.Code != 401 {
+			t.Fatalf("plain handler served an Access caller: %d", rec.Code)
+		}
 	}
 }
