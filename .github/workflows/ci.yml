@@ -14,11 +14,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Upstream code names no platform and no person: they come from values and the owner's profile.
+  # Exception: MIGRATING.md records the move from the two platform copies of this module.
+  names:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Name guard
+        run: |
+          if git grep -niE 'jprinzbach|castillo|niiku|prinzbach|nikolas|philips|freiburg|baloise|primeo|sympany|waldorf|gmail\.com|\blina\b|\bkimi\b' -- . ':!frontendregistry/sources/template/pnpm-lock.yaml' ':!MIGRATING.md' ':!.github/workflows/ci.yml' ':!.github/workflows/mirror.yml'; then
+            echo "platform or personal names in upstream code"; exit 1
+          fi
+
+  # The whole history, every ref (.gitleaks.toml: vendored code and placeholder keys are no secrets).
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.28.0@sha256:cdbb7c955abce02001a9f6c9f602fb195b7fadc1e812065883f695d1eeaba854 \
+            git /repo --redact --no-banner --config /repo/.gitleaks.toml --log-opts="--all"
+
   go:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: stable
       - name: gofmt
@@ -34,8 +58,8 @@ jobs:
   minimum-go:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
       - run: go vet ./...
@@ -47,14 +71,14 @@ jobs:
   scaffold:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: app-foundation
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.27"
           check-latest: true
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "26"
       - name: Generate an app

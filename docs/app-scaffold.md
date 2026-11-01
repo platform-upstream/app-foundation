@@ -20,8 +20,8 @@ No platform's names live in this module. Each platform keeps one profile, e.g. `
 in its config repository:
 
 ```json
-{ "org": "castillo-platform", "domain": "jprinzbach.de",
-  "registry": "zot.int.jprinzbach.de", "accessTeam": "prinzbach.cloudflareaccess.com" }
+{ "org": "acme-apps", "domain": "apps.example.org",
+  "registry": "registry.example.org", "accessTeam": "acme.cloudflareaccess.com" }
 ```
 
 It yields the module path `github.com/<org>/<name>`, the hostname `<name>.<domain>` and the image

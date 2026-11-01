@@ -218,17 +218,17 @@ func TestSubscribeToStoresAndMovesAudience(t *testing.T) {
 	if err := s.SubscribeTo(ctx, phone, "Safari", "nik"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SubscribeTo(ctx, subscription(t, "https://fcm.googleapis.com/fcm/send/tablet"), "Chrome", "kimi"); err != nil {
+	if err := s.SubscribeTo(ctx, subscription(t, "https://fcm.googleapis.com/fcm/send/tablet"), "Chrome", "bob"); err != nil {
 		t.Fatal(err)
 	}
 	if got := audience(phone.Endpoint); got != "nik" {
 		t.Fatalf("phone audience = %q", got)
 	}
-	// The phone now belongs to Kimi.
-	if err := s.SubscribeTo(ctx, subscription(t, phone.Endpoint), "Safari", "kimi"); err != nil {
+	// The phone now belongs to Bob.
+	if err := s.SubscribeTo(ctx, subscription(t, phone.Endpoint), "Safari", "bob"); err != nil {
 		t.Fatal(err)
 	}
-	if got := audience(phone.Endpoint); got != "kimi" {
+	if got := audience(phone.Endpoint); got != "bob" {
 		t.Fatalf("phone audience after move = %q", got)
 	}
 	if n, _ := s.Subscribed(ctx); n != 2 {
@@ -238,7 +238,7 @@ func TestSubscribeToStoresAndMovesAudience(t *testing.T) {
 	if err := s.Subscribe(ctx, subscription(t, phone.Endpoint), "Safari"); err != nil {
 		t.Fatal(err)
 	}
-	if got := audience(phone.Endpoint); got != "kimi" {
+	if got := audience(phone.Endpoint); got != "bob" {
 		t.Fatalf("phone audience after Subscribe = %q", got)
 	}
 	for i := 2; i < MaxSubscriptions; i++ {
@@ -246,7 +246,7 @@ func TestSubscribeToStoresAndMovesAudience(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := s.SubscribeTo(ctx, subscription(t, "https://web.push.apple.com/new"), "", "kimi"); !errors.Is(err, ErrSubscriptionLimit) {
+	if err := s.SubscribeTo(ctx, subscription(t, "https://web.push.apple.com/new"), "", "bob"); !errors.Is(err, ErrSubscriptionLimit) {
 		t.Fatalf("limit error = %v", err)
 	}
 }
@@ -254,7 +254,7 @@ func TestSubscribeToStoresAndMovesAudience(t *testing.T) {
 func TestSendToDeliversOnlyToAudience(t *testing.T) {
 	ctx := context.Background()
 	s := New(openWithAudience(t), enabled)
-	for endpoint, person := range map[string]string{"nik-phone": "nik", "nik-laptop": "nik", "kimi-phone": "kimi"} {
+	for endpoint, person := range map[string]string{"nik-phone": "nik", "nik-laptop": "nik", "bob-phone": "bob"} {
 		if err := s.SubscribeTo(ctx, subscription(t, "https://web.push.apple.com/"+endpoint), "", person); err != nil {
 			t.Fatal(err)
 		}
@@ -267,9 +267,9 @@ func TestSendToDeliversOnlyToAudience(t *testing.T) {
 		reached = append(reached, sub.Endpoint[strings.LastIndex(sub.Endpoint, "/")+1:])
 		return &http.Response{StatusCode: 201, Body: io.NopCloser(strings.NewReader(""))}, nil
 	}
-	delivered, err := s.SendTo(ctx, "kimi", []byte(`{"title":"Nik added an idea"}`))
-	if err != nil || delivered != 1 || len(reached) != 1 || reached[0] != "kimi-phone" {
-		t.Fatalf("SendTo kimi = %d, %v, reached %v", delivered, err, reached)
+	delivered, err := s.SendTo(ctx, "bob", []byte(`{"title":"Nik added an idea"}`))
+	if err != nil || delivered != 1 || len(reached) != 1 || reached[0] != "bob-phone" {
+		t.Fatalf("SendTo bob = %d, %v, reached %v", delivered, err, reached)
 	}
 	reached = nil
 	if delivered, err := s.SendTo(ctx, "nik", []byte("{}")); err != nil || delivered != 2 || len(reached) != 2 {
