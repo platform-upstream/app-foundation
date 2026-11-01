@@ -78,12 +78,12 @@ func TestAllowed(t *testing.T) {
 }
 
 func TestRefs(t *testing.T) {
-	ref := Ref("memory", "note", "food:lina:preferences")
-	if ref != "memory:note/food:lina:preferences" {
+	ref := Ref("memory", "note", "food:alice:preferences")
+	if ref != "memory:note/food:alice:preferences" {
 		t.Fatal(ref)
 	}
 	noun, id, err := ParseRef("memory", ref, "note", "run")
-	if err != nil || noun != "note" || id != "food:lina:preferences" {
+	if err != nil || noun != "note" || id != "food:alice:preferences" {
 		t.Fatalf("ParseRef = %q %q %v", noun, id, err)
 	}
 	if _, _, err := ParseRef("memory", "finance:booking/1", "note"); err == nil || !strings.Contains(err.Error(), "memory:note/<id>") {

@@ -1,6 +1,6 @@
 # app-foundation
 
-`app-foundation` is the deliberately small Go backend toolkit for the first-party applications of the platforms built on platform-upstream (castillo, niiku).
+`app-foundation` is the deliberately small Go backend toolkit for the first-party applications of the platforms built on platform-upstream.
 It packages behavior already needed by Read and proven in Console, Cook, Watch, and Memory while
 leaving application routes, schema, copy, policy, and domain code in each app.
 
@@ -133,7 +133,7 @@ GitHub credentials out of build arguments and image layers. `go mod vendor` reco
 
 ## Version and release policy
 
-SemVer from v1.0.0 (see [MIGRATING.md](MIGRATING.md)). Two platforms consume it (castillo, niiku),
+SemVer from v1.0.0 (see [MIGRATING.md](MIGRATING.md)). Two platforms consume it,
 so: compatible additions are a minor, fixes a patch, and a breaking change is a new major that
 both owners agree on first. Consumers pin an exact tag; Renovate proposes bumps. Before tagging,
 run the checks in WSL or Linux (Windows file locking breaks some tests):
