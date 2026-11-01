@@ -1,0 +1,50 @@
+/* Profile card and settings sheet (app-foundation registry module `profile`). Registry-owned.
+   Colours come from the app: --pf-accent (default a calm ink), --pf-surface, --pf-line, --pf-muted.
+   Everything sits in the `foundation` layer, so the app's own rules win. */
+@layer foundation {
+  .pf-card {
+    display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px; margin: 0;
+    border: 0; border-radius: 12px; background: none; color: inherit; font: inherit; text-align: left;
+    cursor: pointer; min-width: 0;
+  }
+  .pf-card:hover { background: color-mix(in srgb, currentColor 7%, transparent); }
+  .pf-card:focus-visible { outline: 3px solid color-mix(in srgb, var(--pf-accent, #1d1b19) 50%, transparent); outline-offset: 2px; }
+  .pf-card.pf-compact { width: auto; padding: 4px; border-radius: 50%; }
+  .pf-card.pf-loading { height: 56px; }
+  .pf-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  .pf-text b { font-size: 15px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pf-text span { font-size: 13px; opacity: .7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pf-gear { flex: none; opacity: .55; }
+  .pf-avatar { display: block; flex: none; border-radius: 50%; object-fit: cover; background: var(--pf-line, #e7e3dd); }
+  .pf-initials { display: grid; place-items: center; color: #fff; font-weight: 650; background: var(--pf-accent, #6e655c); }
+
+  .pf-backdrop {
+    position: fixed; inset: 0; z-index: 1000; display: flex; align-items: flex-end; justify-content: center;
+    background: rgba(20, 18, 16, .38);
+  }
+  .pf-sheet {
+    width: 100%; max-height: 88dvh; overflow-y: auto; background: var(--pf-surface, #fff); color: var(--pf-text, #1d1b19);
+    border-radius: 18px 18px 0 0; padding: 18px 18px max(18px, env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; gap: 18px; box-shadow: 0 -8px 40px rgba(20, 18, 16, .2);
+  }
+  @media (min-width: 700px) {
+    .pf-backdrop { align-items: center; }
+    .pf-sheet { width: 460px; border-radius: 16px; padding: 22px 24px; }
+  }
+  .pf-head { display: flex; align-items: center; gap: 14px; }
+  .pf-who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .pf-who h2 { margin: 0; font-size: 19px; font-weight: 700; }
+  .pf-who span { font-size: 14px; color: var(--pf-muted, #68625b); overflow-wrap: anywhere; }
+  .pf-x { width: 34px; height: 34px; border: 1px solid var(--pf-line, #e7e3dd); border-radius: 9px; background: none; font-size: 22px; line-height: 1; cursor: pointer; color: inherit; }
+  .pf-field { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .pf-field legend, .pf-label { font-weight: 600; font-size: 15px; padding: 0; margin-bottom: 8px; }
+  .pf-seg { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 3px; border-radius: 11px; background: var(--pf-line, #f0eeea); align-self: flex-start; }
+  .pf-seg button { border: 0; background: none; padding: 7px 13px; border-radius: 8px; font: inherit; font-size: 15px; font-weight: 600; color: var(--pf-muted, #68625b); cursor: pointer; }
+  .pf-seg button.on { background: var(--pf-surface, #fff); color: var(--pf-text, #1d1b19); box-shadow: 0 1px 2px rgba(20, 18, 16, .14); }
+  .pf-spaces { margin: 0; padding-left: 18px; font-size: 15px; color: var(--pf-muted, #68625b); }
+  .pf-actions { display: flex; align-items: center; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+  .pf-error { color: #c62828; font-size: 14px; margin-right: auto; }
+  .pf-btn { border: 1px solid var(--pf-line, #e7e3dd); background: var(--pf-surface, #fff); color: inherit; padding: 9px 16px; border-radius: 10px; font: inherit; font-weight: 600; cursor: pointer; }
+  .pf-btn.pf-pri { background: var(--pf-accent, #1d1b19); border-color: var(--pf-accent, #1d1b19); color: #fff; }
+  .pf-btn:disabled { opacity: .6; }
+}

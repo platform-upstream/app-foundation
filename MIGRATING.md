@@ -1,3 +1,19 @@
+# Migrating to v1.5.0
+
+Compatible (bump, `go mod tidy && go mod vendor`). New:
+
+- `identity.Person.Spaces` and `Via` (directory >= 1.9): where the person's data lives in this
+  app, their own space first, then each family space they share here. Key shared data by
+  `identity.Space{Kind: "family", ID: …}`; `InSpace` checks a space a request names,
+  `FamilySpaces` lists them. An older directory gives the own space only.
+- `profile`: `profile.New(db, client, "/api/me")` mounted at `/api/me` behind
+  `identity.Middleware` serves the person, their photo from directory and their settings in this
+  app (`person_settings`, created on first use; language and the app's own keys).
+- Registry module `profile` (`frontend-registry sync --modules profile`): `ProfileProvider` with
+  the app's `Messages` (de, en; the browser's language by default), `useT()`, `ProfileCard`
+  bottom left of the sidebar (compact in the top bar on phones) and `SettingsSheet` (language plus
+  the app's own fields). Import `foundation/profile.css` after `shell.css`.
+
 # Migrating to v1.4.0
 
 Compatible (bump, `go mod tidy && go mod vendor`). New: periodic backup snapshots of every

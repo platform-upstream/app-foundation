@@ -10,6 +10,9 @@
     "pwa-shell": {
       "description": "iOS-standalone-safe mobile shell: large-viewport height, keyboard handling, nav as the last flex child, published nav height."
     },
+    "profile": {
+      "description": "The signed-in person bottom left (photo from directory), a settings sheet and de/en with the browser's language as default; backend: Go package profile at /api/me."
+    },
     "template": {
       "description": "Minimal React/Vite application with app-owned content, theme, query policy, top bar and nav on the shared shell.",
       "requires": ["pwa", "pwa-shell"]
@@ -21,6 +24,8 @@
     { "module": "pwa-shell", "source": "sources/pwa-shell/shell.css", "target": "src/foundation/shell.css" },
     { "module": "pwa-shell", "source": "sources/pwa-shell/viewport.ts", "target": "src/foundation/viewport.ts" },
     { "module": "pwa-shell", "source": "sources/pwa-shell/AppShell.tsx", "target": "src/foundation/AppShell.tsx" },
+    { "module": "profile", "source": "sources/profile/profile.tsx", "target": "src/foundation/profile.tsx" },
+    { "module": "profile", "source": "sources/profile/profile.css", "target": "src/foundation/profile.css" },
     { "module": "template", "source": "sources/pwa/sw.js", "target": "public/sw.js" },
     { "module": "template", "source": "sources/template/package.json", "target": "package.json" },
     { "module": "template", "source": "sources/template/pnpm-lock.yaml", "target": "pnpm-lock.yaml" },

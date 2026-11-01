@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -152,6 +153,8 @@ type wire struct {
 	Kid        bool              `json:"kid"`
 	Roles      map[string]string `json:"roles"`
 	ActsFor    []string          `json:"actsFor"`
+	Spaces     []Space           `json:"spaces"`
+	Via        string            `json:"via"`
 }
 
 func (c *Client) person(ctx context.Context, path string) (Person, error) {
@@ -187,6 +190,8 @@ func (w wire) person() (Person, error) {
 	if p.ActsFor == nil {
 		p.ActsFor = []string{}
 	}
+	p.Via = w.Via
+	p.Spaces = normalizeSpaces(p.ID, w.Spaces)
 	return p, nil
 }
 
@@ -235,4 +240,16 @@ func (c *Client) get(ctx context.Context, path string, limit int64) ([]byte, err
 		return nil, fmt.Errorf("%w: answer larger than %d bytes", ErrUnavailable, limit)
 	}
 	return body, nil
+}
+
+// normalizeSpaces keeps the own space first and only well-formed family spaces; an older
+// directory without spaces gives the own space only.
+func normalizeSpaces(id string, in []Space) []Space {
+	out := []Space{{Kind: SpacePerson, ID: id}}
+	for _, s := range in {
+		if s.Kind == SpaceFamily && idPattern.MatchString(s.ID) && !slices.Contains(out, s) {
+			out = append(out, s)
+		}
+	}
+	return out
 }

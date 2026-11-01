@@ -52,6 +52,43 @@ type Person struct {
 	Role string `json:"role"`
 	// ActsFor lists the kid profiles this person may act for in this app.
 	ActsFor []string `json:"actsFor"`
+	// Spaces says where this person's data lives in this app: their own space first, then each
+	// family space they share here (directory decides per app and family). Key shared data by the
+	// family space. Never empty: an older directory without spaces counts as the own space only.
+	Spaces []Space `json:"spaces"`
+	// Via says why the person may open the app (owner, everyone, family, grant); "" from an older
+	// directory.
+	Via string `json:"via"`
+}
+
+// Space is one place a person's data lives: their own (Kind "person", ID the person's id) or a
+// family's (Kind "family", ID the family id).
+type Space struct {
+	Kind string `json:"kind"`
+	ID   string `json:"id"`
+}
+
+// Space kinds.
+const (
+	SpacePerson = "person"
+	SpaceFamily = "family"
+)
+
+// FamilySpaces returns the ids of the family spaces p shares in this app.
+func (p Person) FamilySpaces() []string {
+	out := []string{}
+	for _, s := range p.Spaces {
+		if s.Kind == SpaceFamily {
+			out = append(out, s.ID)
+		}
+	}
+	return out
+}
+
+// InSpace reports whether p may read and write data of the space (their own, or a family space
+// they share here).
+func (p Person) InSpace(s Space) bool {
+	return slices.Contains(p.Spaces, s)
 }
 
 // CanActFor reports whether p may act for the person with id.
@@ -121,6 +158,9 @@ func Middleware(resolver Resolver, opts Options) func(http.Handler) http.Handler
 	var local *Person
 	if opts.Local != nil {
 		p := *opts.Local
+		if len(p.Spaces) == 0 {
+			p.Spaces = []Space{{Kind: SpacePerson, ID: p.ID}}
+		}
 		local = &p
 	}
 	return func(next http.Handler) http.Handler {
