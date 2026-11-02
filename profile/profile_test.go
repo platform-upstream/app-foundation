@@ -160,3 +160,34 @@ func TestLookupByAccessEmail(t *testing.T) {
 		}
 	}
 }
+
+type lister map[string][]identity.App
+
+func (l lister) Apps(_ context.Context, id string) ([]identity.App, error) {
+	if a, ok := l[id]; ok {
+		return a, nil
+	}
+	return nil, identity.ErrUnknown
+}
+
+// The menu's app list is the signed-in adult's, also while acting for a kid; [] without a list.
+func TestOtherApps(t *testing.T) {
+	cook := []identity.App{{Key: "cook", Name: "Cook", URL: "https://cook.example.org/"}}
+	h := setup(t).Apps(lister{"alice": cook})
+	read := func(rec *httptest.ResponseRecorder) []identity.App {
+		var out []identity.App
+		if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &out) != nil {
+			t.Fatalf("%d %s", rec.Code, rec.Body.String())
+		}
+		return out
+	}
+	if got := read(do(h, alice, alice, http.MethodGet, "/api/me/apps", nil)); len(got) != 1 || got[0].Key != "cook" {
+		t.Fatalf("alice %+v", got)
+	}
+	if got := read(do(h, alice, emma, http.MethodGet, "/api/me/apps", nil)); len(got) != 1 {
+		t.Fatalf("alice for emma %+v", got)
+	}
+	if got := read(do(setup(t), alice, alice, http.MethodGet, "/api/me/apps", nil)); got == nil || len(got) != 0 {
+		t.Fatalf("no lister %+v", got)
+	}
+}

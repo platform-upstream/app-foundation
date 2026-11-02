@@ -1,7 +1,8 @@
 // The signed-in person, their settings and the language (app-foundation registry module `profile`).
 // Registry-owned: do not edit in an application. The backend is the Go package `profile` mounted at
 // /api/me. Wrap the app in <ProfileProvider messages={…}>; use useT() for every visible string.
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 export type Language = 'de' | 'en';
 
@@ -49,6 +50,16 @@ const OWN: Messages = {
     'profile.spaces': 'Your data',
     'profile.space.own': 'Your own',
     'profile.space.family': 'Shared with family {id}',
+    'profile.menu': 'Menu',
+    'profile.theme': 'Appearance',
+    'profile.theme.auto': 'Auto',
+    'profile.theme.light': 'Light',
+    'profile.theme.dark': 'Dark',
+    'profile.apps': 'Other apps',
+    'profile.apps.none': 'No other apps.',
+    'profile.back': 'Back',
+    'profile.saveFailed': 'Not saved: {error}',
+    'profile.lang.auto': 'Auto',
   },
   de: {
     'profile.settings': 'Einstellungen',
@@ -66,6 +77,16 @@ const OWN: Messages = {
     'profile.spaces': 'Deine Daten',
     'profile.space.own': 'Deine eigenen',
     'profile.space.family': 'Geteilt mit Familie {id}',
+    'profile.menu': 'Menü',
+    'profile.theme': 'Darstellung',
+    'profile.theme.auto': 'Auto',
+    'profile.theme.light': 'Hell',
+    'profile.theme.dark': 'Dunkel',
+    'profile.apps': 'Andere Apps',
+    'profile.apps.none': 'Keine anderen Apps.',
+    'profile.back': 'Zurück',
+    'profile.saveFailed': 'Nicht gespeichert: {error}',
+    'profile.lang.auto': 'Auto',
   },
 };
 
@@ -87,21 +108,41 @@ export function translate(messages: Messages, lang: Language, key: string, vars?
 
 const LOCAL_KEY = 'profile.language';
 
+const THEME_KEY = 'profile.theme';
+
+/** The person's appearance choice (settings.extra.theme); 'auto' follows the system. */
+export type Theme = 'auto' | 'light' | 'dark';
+
+function asTheme(v: unknown): Theme { return v === 'light' || v === 'dark' ? v : 'auto'; }
+
+function systemDark(): boolean {
+  return typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
 interface Ctx {
   profile: Profile | undefined;
   error: string;
   lang: Language;
   t: (key: string, vars?: Record<string, string | number>) => string;
   saveSettings: (s: Settings) => Promise<void>;
+  /** Saves at once, shown before the server answers (reverted if it fails). */
+  updateSettings: (patch: { language?: '' | Language; extra?: Record<string, unknown> }) => Promise<void>;
   /** Number and date formatting for the language (de-CH / en-GB). */
   locale: string;
+  /** Where /api/me is mounted. */
+  base: string;
+  /** The app offers light and dark (ProfileProvider themes). */
+  themes: boolean;
+  theme: Theme;
 }
 
 const ProfileContext = createContext<Ctx | null>(null);
 
 /** Loads /api/me once and provides the profile, the language and t(). The language is the person's
- *  setting, else the browser's; it is cached locally so the first paint is already right. */
-export function ProfileProvider({ messages, children, base = '/api/me' }: { messages: Messages; children: ReactNode; base?: string }) {
+ *  setting, else the browser's; it is cached locally so the first paint is already right.
+ *  themes: the app has a dark look; <html data-theme="light|dark"> then follows the person's choice
+ *  (settings.extra.theme, else the system), and the menu offers it. */
+export function ProfileProvider({ messages, children, base = '/api/me', themes = false }: { messages: Messages; children: ReactNode; base?: string; themes?: boolean }) {
   const [profile, setProfile] = useState<Profile>();
   const [error, setError] = useState('');
   const [stored, setStored] = useState<'' | Language>(() => {
@@ -130,6 +171,24 @@ export function ProfileProvider({ messages, children, base = '/api/me' }: { mess
   const lang = stored || browserLanguage();
   useEffect(() => { document.documentElement.lang = lang; }, [lang]);
 
+  const [theme, setTheme] = useState<Theme>(() => asTheme(typeof localStorage === 'undefined' ? '' : localStorage.getItem(THEME_KEY)));
+  useEffect(() => { if (profile) setTheme(asTheme(profile.settings.extra.theme)); }, [profile]);
+  useEffect(() => {
+    if (!themes) return;
+    localStorage.setItem(THEME_KEY, theme);
+    const root = document.documentElement;
+    const apply = () => {
+      const dark = theme === 'dark' || (theme === 'auto' && systemDark());
+      root.dataset.theme = dark ? 'dark' : 'light';
+      root.style.colorScheme = dark ? 'dark' : 'light';
+    };
+    apply();
+    if (theme !== 'auto' || typeof matchMedia === 'undefined') return;
+    const mq = matchMedia('(prefers-color-scheme: dark)');
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, [themes, theme]);
+
   const saveSettings = useCallback(async (s: Settings) => {
     const r = await fetch(`${base}/settings`, {
       method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(s),
@@ -144,10 +203,28 @@ export function ProfileProvider({ messages, children, base = '/api/me' }: { mess
     setProfile((p) => (p ? { ...p, settings: saved } : p));
   }, [base]);
 
+  const updateSettings = useCallback(async (patch: { language?: '' | Language; extra?: Record<string, unknown> }) => {
+    const before = profile;
+    if (!before) return;
+    const next: Settings = {
+      language: patch.language ?? before.settings.language,
+      extra: { ...before.settings.extra, ...patch.extra },
+    };
+    setProfile({ ...before, settings: next });
+    if (patch.language !== undefined) setStored(patch.language);
+    try {
+      await saveSettings(next);
+    } catch (e) {
+      setProfile(before);
+      setStored(before.settings.language);
+      throw e;
+    }
+  }, [profile, saveSettings]);
+
   const value = useMemo<Ctx>(() => ({
-    profile, error, lang, saveSettings, locale: lang === 'de' ? 'de-CH' : 'en-GB',
+    profile, error, lang, saveSettings, updateSettings, base, themes, theme, locale: lang === 'de' ? 'de-CH' : 'en-GB',
     t: (key, vars) => translate(messages, lang, key, vars),
-  }), [profile, error, lang, saveSettings, messages]);
+  }), [profile, error, lang, saveSettings, updateSettings, base, themes, theme, messages]);
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;
 }
 
@@ -160,7 +237,13 @@ function useCtx(): Ctx {
 /** t() for the current language. */
 export function useT() { return useCtx().t; }
 export function useLanguage() { const c = useCtx(); return { lang: c.lang, locale: c.locale }; }
-export function useProfile() { const c = useCtx(); return { profile: c.profile, error: c.error, saveSettings: c.saveSettings }; }
+export function useProfile() { const c = useCtx(); return { profile: c.profile, error: c.error, saveSettings: c.saveSettings, updateSettings: c.updateSettings }; }
+/** The app's own setting key (settings.extra), with a fallback until the profile has loaded. */
+export function useSetting<T>(key: string, fallback: T): T {
+  const v = useCtx().profile?.settings.extra[key];
+  return v === undefined ? fallback : (v as T);
+}
+export function useTheme() { const c = useCtx(); return { theme: c.theme, enabled: c.themes }; }
 
 export function initials(name: string): string {
   const w = name.trim().split(/\s+/).filter(Boolean);
@@ -262,4 +345,224 @@ export function SettingsSheet({ open, onClose, children }: {
       </div>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------------------------
+// The menu: the person, language and appearance, the app's own entries, and the person's other
+// apps. Choices save at once (no Save button); the app declares its entries as data.
+
+export type MenuItem =
+  /** A switch stored in settings.extra[key]. */
+  | { kind: 'toggle'; key: string; label: string; hint?: string; default?: boolean }
+  /** One of a few values, stored in settings.extra[key]. */
+  | { kind: 'choice'; key: string; label: string; options: { value: string; label: string }[]; default?: string }
+  /** Runs something in the app; the menu closes unless keepOpen. */
+  | { kind: 'action'; label: string; hint?: string; icon?: ReactNode; onSelect: () => void; disabled?: boolean; keepOpen?: boolean }
+  /** Opens a page (in the app, or elsewhere with external). */
+  | { kind: 'link'; label: string; href: string; hint?: string; icon?: ReactNode; external?: boolean }
+  /** A fact about the person in this app. */
+  | { kind: 'info'; label: string; value: ReactNode; icon?: ReactNode };
+
+export interface MenuSection { title?: string; items: MenuItem[] }
+
+/** One of the person's other apps (GET {base}/apps; anything but 200 hides the list). */
+export interface OtherApp { key: string; name: string; url: string; color?: string }
+
+const TONES = ['#C2185B', '#2F7D8C', '#6B8F5E', '#E0A21B', '#3C6FD1', '#8C6A4A', '#D2453A', '#4E7A63', '#B8478A', '#E8622F'];
+function tone(key: string): string {
+  let h = 0;
+  for (const c of key) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return TONES[h % TONES.length]!;
+}
+
+function useOtherApps(open: boolean): OtherApp[] | undefined {
+  const { base } = useCtx();
+  const [apps, setApps] = useState<OtherApp[]>();
+  const asked = useRef(false);
+  useEffect(() => {
+    if (!open || asked.current) return;
+    asked.current = true;
+    fetch(`${base}/apps`, { credentials: 'same-origin', redirect: 'manual', headers: { Accept: 'application/json' } })
+      .then(async (r) => (r.ok ? ((await r.json()) as OtherApp[]) : []))
+      .then((list) => setApps(Array.isArray(list) ? list.filter((a) => /^https:\/\//.test(a.url)) : []))
+      .catch(() => setApps([]));
+  }, [open, base]);
+  return apps;
+}
+
+function Glyph({ d, size = 18 }: { d: ReactNode; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>;
+}
+
+function Segmented<V extends string>({ label, value, options, onChange }: { label: string; value: V; options: { value: V; label: string }[]; onChange: (v: V) => void }) {
+  return (
+    <div className={`pf-row${options.length > 3 ? ' pf-row-stack' : ''}`}>
+      <span className="pf-row-label">{label}</span>
+      <div className="pf-seg" role="radiogroup" aria-label={label}>
+        {options.map((o) => (
+          <button key={o.value || 'auto'} type="button" role="radio" aria-checked={value === o.value}
+            className={value === o.value ? 'on' : ''} onClick={() => onChange(o.value)}>{o.label}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type Patch = { language?: '' | Language; extra?: Record<string, unknown> };
+
+/** The profile card that opens the menu. Bottom left of the sidebar it opens upwards; compact (the
+ *  photo alone, top bar on phones) it opens downwards. Under 700px it is a bottom sheet. */
+export function ProfileMenu({ sections = [], compact = false, apps = true }: { sections?: MenuSection[]; compact?: boolean; apps?: boolean }) {
+  const c = useCtx();
+  const { profile, updateSettings, themes, theme, t } = c;
+  const [open, setOpen] = useState(false);
+  const [err, setErr] = useState('');
+  const others = useOtherApps(open && apps);
+  const wrap = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const [place, setPlace] = useState<CSSProperties>({});
+
+  // The panel lives in <body> (no sidebar overflow or header stacking clips it); on wide screens
+  // it is placed beside the card: above it from the sidebar, below it from the top bar.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const at = () => {
+      const r = trigger.current?.getBoundingClientRect();
+      if (!r || innerWidth < 700) { setPlace({}); return; }
+      const width = Math.min(340, innerWidth - 16);
+      const left = Math.max(8, Math.min(compact ? r.right - width : r.left, innerWidth - width - 8));
+      setPlace(compact ? { left, top: r.bottom + 8, width } : { left, bottom: innerHeight - r.top + 8, width });
+    };
+    at();
+    addEventListener('resize', at);
+    return () => removeEventListener('resize', at);
+  }, [open, compact]);
+
+  const close = useCallback((focus = true) => {
+    setOpen(false);
+    if (focus) trigger.current?.focus();
+  }, []);
+  useEffect(() => {
+    if (!open) return;
+    setErr('');
+    panel.current?.querySelector<HTMLElement>('button, a[href]')?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); close(); } };
+    const onDown = (e: PointerEvent) => {
+      const n = e.target as Node;
+      if (!wrap.current?.contains(n) && !panel.current?.contains(n)) close(false);
+    };
+    window.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onDown);
+    return () => { window.removeEventListener('keydown', onKey); document.removeEventListener('pointerdown', onDown); };
+  }, [open, close]);
+
+  if (!profile) return compact ? null : <div className="pf-card pf-loading" aria-hidden="true" />;
+  const save = (patch: Patch) => {
+    setErr('');
+    updateSettings(patch).catch((e: unknown) => setErr(t('profile.saveFailed', { error: e instanceof Error ? e.message : String(e) })));
+  };
+  const shown = profile.actor ? { name: profile.actor.name, photo: '' } : profile;
+  const sub = profile.actor ? t('profile.actingFor', { name: profile.name }) : t(`profile.role.${profile.role}`);
+  const extra = profile.settings.extra;
+
+  return (
+    <div ref={wrap} className={`pf-menu-wrap${compact ? ' pf-compact-wrap' : ''}`}>
+      <button ref={trigger} type="button" className={`pf-card${compact ? ' pf-compact' : ''}${open ? ' pf-open' : ''}`}
+        aria-haspopup="dialog" aria-expanded={open} aria-label={`${t('profile.menu')}: ${shown.name}`} onClick={() => setOpen((o) => !o)}>
+        <Avatar name={shown.name} photo={shown.photo} size={compact ? 32 : 36} />
+        {!compact && <span className="pf-text"><b>{shown.name}</b><span>{sub}</span></span>}
+        {!compact && <span className="pf-chev" aria-hidden="true"><Glyph d={<path d="M8 10l4-4 4 4M8 14l4 4 4-4" />} size={16} /></span>}
+      </button>
+      {open && createPortal(
+        <>
+          <div className="pf-scrim" aria-hidden="true" onClick={() => close(false)} />
+          <div ref={panel} className={`pf-menu ${compact ? 'pf-down' : 'pf-up'}`} style={place} role="dialog" aria-label={t('profile.menu')}>
+            <div className="pf-grab" aria-hidden="true" />
+            <div className="pf-menu-head">
+              <Avatar name={shown.name} photo={shown.photo} size={48} />
+              <div className="pf-who">
+                <b>{shown.name}</b>
+                <span>{profile.actor ? sub : [profile.email, t(`profile.role.${profile.role}`)].filter(Boolean).join(' · ')}</span>
+              </div>
+            </div>
+            <div className="pf-group">
+              <Segmented label={t('profile.language')} value={profile.settings.language}
+                options={[{ value: '' as const, label: t('profile.lang.auto') }, { value: 'de' as const, label: 'DE' }, { value: 'en' as const, label: 'EN' }]}
+                onChange={(v) => save({ language: v })} />
+              {themes && (
+                <Segmented label={t('profile.theme')} value={theme}
+                  options={(['auto', 'light', 'dark'] as const).map((v) => ({ value: v, label: t(`profile.theme.${v}`) }))}
+                  onChange={(v) => save({ extra: { theme: v } })} />
+              )}
+            </div>
+            {sections.filter((s) => s.items.length).map((s, i) => (
+              <div className="pf-group" key={s.title ?? i}>
+                {s.title && <div className="pf-group-title">{s.title}</div>}
+                {s.items.map((it, j) => <Item key={j} item={it} extra={extra} save={save} close={close} />)}
+              </div>
+            ))}
+            {apps && others && others.length > 0 && (
+              <div className="pf-group">
+                <div className="pf-group-title">{t('profile.apps')}</div>
+                <div className="pf-apps">
+                  {others.map((a) => (
+                    <a key={a.key} className="pf-app" href={a.url}>
+                      <span className="pf-app-ic" style={{ background: a.color || tone(a.key) }} aria-hidden="true">{a.name.trim().charAt(0).toUpperCase()}</span>
+                      <span className="pf-app-name">{a.name}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+            {err && <div className="pf-error" role="alert">{err}</div>}
+          </div>
+        </>,
+        document.body,
+      )}
+    </div>
+  );
+}
+
+function Item({ item, extra, save, close }: {
+  item: MenuItem; extra: Record<string, unknown>; save: (p: Patch) => void; close: (focus?: boolean) => void;
+}) {
+  switch (item.kind) {
+    case 'toggle': {
+      const on = (extra[item.key] ?? item.default ?? false) === true;
+      return (
+        <button type="button" className="pf-item" role="switch" aria-checked={on} onClick={() => save({ extra: { [item.key]: !on } })}>
+          <span className="pf-item-text"><span>{item.label}</span>{item.hint && <small>{item.hint}</small>}</span>
+          <span className={`pf-switch${on ? ' on' : ''}`} aria-hidden="true"><i /></span>
+        </button>
+      );
+    }
+    case 'choice': {
+      const v = String(extra[item.key] ?? item.default ?? item.options[0]?.value ?? '');
+      return <Segmented label={item.label} value={v} options={item.options} onChange={(x) => save({ extra: { [item.key]: x } })} />;
+    }
+    case 'action':
+      return (
+        <button type="button" className="pf-item" disabled={item.disabled} onClick={() => { item.onSelect(); if (!item.keepOpen) close(false); }}>
+          {item.icon && <span className="pf-item-ic">{item.icon}</span>}
+          <span className="pf-item-text"><span>{item.label}</span>{item.hint && <small>{item.hint}</small>}</span>
+        </button>
+      );
+    case 'link':
+      return (
+        <a className="pf-item" href={item.href} {...(item.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})} onClick={() => close(false)}>
+          {item.icon && <span className="pf-item-ic">{item.icon}</span>}
+          <span className="pf-item-text"><span>{item.label}</span>{item.hint && <small>{item.hint}</small>}</span>
+          <span className="pf-item-end"><Glyph d={item.external ? <><path d="M14 5h5v5" /><path d="M19 5l-8 8" /><path d="M18 14v5H5V6h5" /></> : <path d="M9 6l6 6-6 6" />} size={16} /></span>
+        </a>
+      );
+    default:
+      return (
+        <div className="pf-item pf-info">
+          {item.icon && <span className="pf-item-ic">{item.icon}</span>}
+          <span className="pf-item-text"><span>{item.label}</span></span>
+          <span className="pf-item-val">{item.value}</span>
+        </div>
+      );
+  }
 }
