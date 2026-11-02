@@ -46,6 +46,8 @@ func fakeDirectory(t *testing.T) (*httptest.Server, *[]string) {
 			w.WriteHeader(http.StatusBadGateway)
 		case "/internal/v1/people/moved":
 			http.Redirect(w, r, "https://elsewhere.example/steal", http.StatusFound)
+		case "/internal/v1/people/alice/apps":
+			_, _ = w.Write([]byte(`[{"key":"cook","name":"Cook","url":"https://cook.example.org/","color":"#6B8F5E"},{"key":"evil","name":"Evil","url":"javascript:alert(1)"},{"key":"plain","name":"Plain","url":"http://plain.example.org/"}]`))
 		case "/internal/v1/people/alice/photo":
 			w.Header().Set("Content-Type", "image/jpeg")
 			_, _ = w.Write([]byte("jpeg"))
@@ -179,5 +181,21 @@ func TestClientReadsSpaces(t *testing.T) {
 	emma, _ := c.ByID(ctx, "emma")
 	if !reflect.DeepEqual(emma.Spaces, []Space{{SpacePerson, "emma"}}) {
 		t.Fatalf("emma %+v", emma.Spaces)
+	}
+}
+
+// Only https links reach the menu; an older directory without the list is ErrUnknown.
+func TestClientListsAPersonsApps(t *testing.T) {
+	srv, _ := fakeDirectory(t)
+	c, _ := NewClient(Config{URL: srv.URL, Key: testKey})
+	apps, err := c.Apps(context.Background(), "alice")
+	if err != nil || len(apps) != 1 || apps[0].Key != "cook" || apps[0].Color != "#6B8F5E" {
+		t.Fatalf("%+v %v", apps, err)
+	}
+	if _, err := c.Apps(context.Background(), "bob"); !errors.Is(err, ErrUnknown) {
+		t.Fatalf("no list: %v", err)
+	}
+	if _, err := c.Apps(context.Background(), "../people"); !errors.Is(err, ErrUnknown) {
+		t.Fatalf("bad id: %v", err)
 	}
 }

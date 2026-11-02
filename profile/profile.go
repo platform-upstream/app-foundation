@@ -34,6 +34,11 @@ type Photos interface {
 	Photo(ctx context.Context, p identity.Person) ([]byte, error)
 }
 
+// AppLister lists a person's other apps (identity.Client.Apps). nil: no list.
+type AppLister interface {
+	Apps(ctx context.Context, id string) ([]identity.App, error)
+}
+
 // Me is what GET /api/me answers.
 type Me struct {
 	ID    string `json:"id"`
@@ -66,6 +71,7 @@ type Handler struct {
 	photos Photos
 	prefix string
 	lookup identity.Resolver
+	apps   AppLister
 	// anyCaller: serve a profile from the Access e-mail even without a lookup.
 	anyCaller bool
 	once      sync.Once
@@ -103,6 +109,12 @@ func (h *Handler) init(ctx context.Context) error {
 // The lookup never admits anyone: the app's own gate stays in front.
 func (h *Handler) Lookup(r identity.Resolver) *Handler {
 	h.lookup = r
+	return h
+}
+
+// Apps serves GET {prefix}/apps: the person's other apps for the menu, from directory.
+func (h *Handler) Apps(l AppLister) *Handler {
+	h.apps = l
 	return h
 }
 
@@ -145,6 +157,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch rest := strings.TrimPrefix(r.URL.Path, h.prefix); {
 	case (rest == "" || rest == "/") && r.Method == http.MethodGet:
 		h.me(w, r, person)
+	case rest == "/apps" && r.Method == http.MethodGet:
+		h.otherApps(w, r, person)
 	case rest == "/photo" && r.Method == http.MethodGet:
 		h.photo(w, r, person)
 	case rest == "/settings" && r.Method == http.MethodGet:
@@ -211,6 +225,23 @@ func (h *Handler) photo(w http.ResponseWriter, r *http.Request, person identity.
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Cache-Control", "private, max-age=86400")
 	_, _ = w.Write(data)
+}
+
+// otherApps answers [] when there is no list (no lister, a kid acting through an adult, directory
+// unreachable): the menu then just shows none.
+func (h *Handler) otherApps(w http.ResponseWriter, r *http.Request, person identity.Person) {
+	list := []identity.App{}
+	id := person.ID
+	if actor, ok := identity.ActorFrom(r.Context()); ok {
+		id = actor.ID
+	}
+	if h.apps != nil {
+		if got, err := h.apps.Apps(r.Context(), id); err == nil {
+			list = got
+		}
+	}
+	w.Header().Set("Cache-Control", "private, max-age=300")
+	_ = httpx.WriteJSON(w, http.StatusOK, list)
 }
 
 // Get returns a person's settings in this app (defaults when none are stored).

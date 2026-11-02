@@ -11,7 +11,7 @@
       "description": "iOS-standalone-safe mobile shell: large-viewport height, keyboard handling, nav as the last flex child, published nav height."
     },
     "profile": {
-      "description": "The signed-in person bottom left (photo from directory), a settings sheet and de/en with the browser's language as default; backend: Go package profile at /api/me."
+      "description": "The signed-in person bottom left (photo from directory) opening a menu: de/en, light/dark, the app's own settings and the person's other apps; backend: Go package profile at /api/me."
     },
     "template": {
       "description": "Minimal React/Vite application with app-owned content, theme, query policy, top bar and nav on the shared shell.",

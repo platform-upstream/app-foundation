@@ -195,6 +195,37 @@ func (w wire) person() (Person, error) {
 	return p, nil
 }
 
+// App is one of a person's other apps, for the app menu.
+type App struct {
+	Key   string `json:"key"`
+	Name  string `json:"name"`
+	URL   string `json:"url"`
+	Color string `json:"color,omitempty"`
+}
+
+// Apps returns the other apps the person with id may open (not this one). An older directory
+// without the list answers ErrUnknown.
+func (c *Client) Apps(ctx context.Context, id string) ([]App, error) {
+	if !idPattern.MatchString(id) {
+		return nil, ErrUnknown
+	}
+	body, err := c.get(ctx, "/internal/v1/people/"+id+"/apps", maxListBytes)
+	if err != nil {
+		return nil, err
+	}
+	var apps []App
+	if err := json.Unmarshal(body, &apps); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrUnavailable, err)
+	}
+	out := make([]App, 0, len(apps))
+	for _, a := range apps {
+		if u, err := url.Parse(a.URL); err == nil && u.Scheme == "https" && u.Host != "" && a.Name != "" {
+			out = append(out, a)
+		}
+	}
+	return out, nil
+}
+
 // Photo returns p's uploaded photo (JPEG); ErrUnknown when p has none. Serve it to the browser
 // from an app route with "Cache-Control: private".
 func (c *Client) Photo(ctx context.Context, p Person) ([]byte, error) {

@@ -1,3 +1,20 @@
+# Migrating to v1.7.0
+
+Compatible. The `profile` module gets a menu; `ProfileCard` and `SettingsSheet` stay.
+
+- `ProfileMenu` replaces card plus sheet: `<ProfileMenu sections={…} />` bottom left of the
+  sidebar, `<ProfileMenu compact sections={…} />` in the top bar on phones (a bottom sheet there).
+  Language (and appearance) apply at once; there is no Save button.
+- App entries are data (`MenuSection[]`): `toggle` and `choice` store `settings.extra[key]`, read
+  them with `useSetting(key, fallback)`; `action`, `link` and `info` for the rest.
+- `<ProfileProvider themes>` for apps with a dark look: the menu offers Auto/Light/Dark
+  (`settings.extra.theme`) and sets `<html data-theme="light|dark">`; style
+  `:root[data-theme="dark"]`. Without `themes` nothing changes.
+- Other apps: `profile.New(…).Apps(client)` serves `{prefix}/apps` from directory (>= 1.10,
+  `identity.Client.Apps`); without it, or with an older directory, the list is empty and hidden.
+- The menu renders into `<body>`; an app's own `button` reset may still need a restore rule, check
+  the menu in a screenshot.
+
 # Migrating to v1.6.0
 
 Compatible. `profile.Handler.FromAccess()` and `.Lookup(resolver)` serve `/api/me` to apps that
