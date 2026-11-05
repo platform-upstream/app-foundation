@@ -164,16 +164,18 @@ func NewState() string {
 // AuthCodeURL is Google's consent page for state: offline access (a refresh token) and the
 // consent screen every time (prompt=consent), so the person sees what they grant and a reconnect
 // always yields a new refresh token. loginHint, an e-mail address or empty, preselects the
-// account.
-func (c *Client) AuthCodeURL(state, loginHint string) string {
-	opts := []oauth2.AuthCodeOption{oauth2.AccessTypeOffline, oauth2.ApprovalForce}
+// account. The URL carries a PKCE challenge (S256); the app stores the returned verifier with the
+// state and hands it to Exchange, so a code taken from the callback is worthless elsewhere.
+func (c *Client) AuthCodeURL(state, loginHint string) (url, verifier string) {
+	verifier = oauth2.GenerateVerifier()
+	opts := []oauth2.AuthCodeOption{oauth2.AccessTypeOffline, oauth2.ApprovalForce, oauth2.S256ChallengeOption(verifier)}
 	if loginHint != "" {
 		opts = append(opts, oauth2.SetAuthURLParam("login_hint", loginHint))
 	}
 	if c.includeGrantedScopes {
 		opts = append(opts, oauth2.SetAuthURLParam("include_granted_scopes", "true"))
 	}
-	return c.oauth.AuthCodeURL(state, opts...)
+	return c.oauth.AuthCodeURL(state, opts...), verifier
 }
 
 // Grant is what a completed consent gives the app to store.
@@ -192,13 +194,17 @@ type Grant struct {
 // Exchange trades the callback's code for a Grant. The app has already checked the state and
 // read the callback's error parameter (access_denied when the person cancels). Exchange fails
 // with ErrMissingScopes when a required scope was not granted, with ErrInvalidGrant for a code
-// that is expired or used, and when the account has no verified e-mail. The access token that
-// comes with the grant is cached for AccessToken.
-func (c *Client) Exchange(ctx context.Context, code string) (Grant, error) {
+// that is expired or used, and when the account has no verified e-mail. verifier is the one
+// AuthCodeURL returned for this state. The access token that comes with the grant is cached for
+// AccessToken.
+func (c *Client) Exchange(ctx context.Context, code, verifier string) (Grant, error) {
 	if strings.TrimSpace(code) == "" {
 		return Grant{}, errors.New("googleauth: the callback carries no code")
 	}
-	token, err := c.oauth.Exchange(c.withHTTP(ctx), code)
+	if verifier == "" {
+		return Grant{}, errors.New("googleauth: no PKCE verifier for this state")
+	}
+	token, err := c.oauth.Exchange(c.withHTTP(ctx), code, oauth2.VerifierOption(verifier))
 	if err != nil {
 		return Grant{}, tokenError("exchange", err)
 	}

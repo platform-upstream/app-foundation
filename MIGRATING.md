@@ -6,8 +6,8 @@ Compatible. New package `googleauth` for an app that connects a person's own Goo
 - Config: the OAuth client (Web application) with the app's callback as a redirect URI, the
   scopes the app needs (`openid email` are added) and `OptionalScopes` it can do without. A
   client shared with other apps keeps `IncludeGrantedScopes` off.
-- Store: the app's own tables. A state from `NewState` with the person, for `StateTTL`, taken
-  once in the callback; per person the three `Sealed` values, the account e-mail (`Grant.Email`,
+- Store: the app's own tables. A state from `NewState` with the person and the PKCE verifier
+  `AuthCodeURL` returns, for `StateTTL`, taken once in the callback and passed to `Exchange`; per person the three `Sealed` values, the account e-mail (`Grant.Email`,
   the additional data `Open` needs) and the granted scopes. A token key of 32 random bytes in
   base64 (`openssl rand -base64 32`) from a secret, read with `ParseKey` at startup.
 - Use: `Client.AccessToken(ctx, refresh)` before each Google call; the Client caches access tokens
@@ -16,7 +16,7 @@ Compatible. New package `googleauth` for an app that connects a person's own Goo
 
 An app with its own Google code (Omni, Paper) keeps its tables and key: `Key.Open(Sealed{ciphertext,
 iv, tag}, user_email)` opens the stored rows and `Seal` writes the same format, so nobody consents
-again. Its HMAC-signed state, token cache and refresh code go; its required scopes move to
+again. Its HMAC-signed state becomes a stored state with its verifier; its token cache and refresh code go; its required scopes move to
 `Config.Scopes` (an optional one such as Paper's Gmail to `OptionalScopes`). An app whose client
 is shared with others drops its revoke on disconnect.
 

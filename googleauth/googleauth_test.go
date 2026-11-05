@@ -13,6 +13,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"golang.org/x/oauth2"
 )
 
 const calendarScope = "https://www.googleapis.com/auth/calendar.app.created"
@@ -193,7 +195,8 @@ func TestAuthCodeURL(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			c := f.client(t, tc.edit)
 			state := NewState()
-			u, err := url.Parse(c.AuthCodeURL(state, tc.loginHint))
+			raw, verifier := c.AuthCodeURL(state, tc.loginHint)
+			u, err := url.Parse(raw)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -201,12 +204,14 @@ func TestAuthCodeURL(t *testing.T) {
 				t.Fatalf("consent URL %s", u)
 			}
 			want := url.Values{
-				"response_type": {"code"},
-				"client_id":     {"client-id"},
-				"redirect_uri":  {"https://app.example.org/api/google/callback"},
-				"access_type":   {"offline"},
-				"prompt":        {"consent"},
-				"state":         {state},
+				"response_type":         {"code"},
+				"client_id":             {"client-id"},
+				"redirect_uri":          {"https://app.example.org/api/google/callback"},
+				"access_type":           {"offline"},
+				"prompt":                {"consent"},
+				"state":                 {state},
+				"code_challenge":        {oauth2.S256ChallengeFromVerifier(verifier)},
+				"code_challenge_method": {"S256"},
 			}
 			for k, v := range tc.want {
 				want[k] = v
@@ -215,6 +220,13 @@ func TestAuthCodeURL(t *testing.T) {
 				t.Fatalf("query\n got %v\nwant %v", got, want)
 			}
 		})
+	}
+}
+
+func TestExchangeNeedsTheVerifier(t *testing.T) {
+	c := newFake(t).client(t, nil)
+	if _, err := c.Exchange(context.Background(), "4/code", ""); err == nil {
+		t.Fatal("exchange without a PKCE verifier succeeded")
 	}
 }
 
@@ -349,7 +361,7 @@ func TestExchange(t *testing.T) {
 			f.token = func(w http.ResponseWriter, v url.Values) { form = v; inner(w, v) }
 			c := f.client(t, tc.edit)
 
-			grant, err := c.Exchange(context.Background(), tc.code)
+			grant, err := c.Exchange(context.Background(), tc.code, "verifier-1")
 			if tc.wantErr == nil && tc.errText == "" {
 				if err != nil {
 					t.Fatalf("Exchange: %v", err)
@@ -358,7 +370,7 @@ func TestExchange(t *testing.T) {
 					t.Fatalf("grant\n got %+v\nwant %+v", grant, tc.want)
 				}
 				want := url.Values{"grant_type": {"authorization_code"}, "code": {tc.code}, "redirect_uri": {"https://app.example.org/api/google/callback"},
-					"client_id": {"client-id"}, "client_secret": {"client-secret"}}
+					"client_id": {"client-id"}, "client_secret": {"client-secret"}, "code_verifier": {"verifier-1"}}
 				if !reflect.DeepEqual(form, want) {
 					t.Fatalf("token form %v", form)
 				}
@@ -386,7 +398,7 @@ func TestExchange(t *testing.T) {
 func TestExchangeCachesTheAccessToken(t *testing.T) {
 	f := newFake(t)
 	c := f.client(t, nil)
-	grant, err := c.Exchange(context.Background(), "4/code")
+	grant, err := c.Exchange(context.Background(), "4/code", "verifier-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -593,7 +605,7 @@ func TestSecretsNeverFollowARedirect(t *testing.T) {
 		w.WriteHeader(http.StatusTemporaryRedirect)
 	}
 	c := f.client(t, nil)
-	if _, err := c.Exchange(context.Background(), "4/code"); err == nil {
+	if _, err := c.Exchange(context.Background(), "4/code", "verifier-1"); err == nil {
 		t.Fatal("exchange through a redirect succeeded")
 	}
 	if _, err := c.AccessToken(context.Background(), "1//alice"); err == nil {

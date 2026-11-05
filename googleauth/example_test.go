@@ -15,9 +15,10 @@ import (
 // store is the app's own SQL: an oauth_states table and a table of grants with the three sealed
 // columns, the account e-mail and the scopes, keyed by the person.
 type store interface {
-	SaveState(ctx context.Context, state, person string, expires time.Time) error
-	// TakeState deletes the state and reports whether it was unexpired and that person's.
-	TakeState(ctx context.Context, state, person string) (bool, error)
+	SaveState(ctx context.Context, state, verifier, person string, expires time.Time) error
+	// TakeState deletes the state and returns its PKCE verifier when it was unexpired and that
+	// person's ("" otherwise).
+	TakeState(ctx context.Context, state, person string) (string, error)
 	SaveGrant(ctx context.Context, person, email string, token googleauth.Sealed, scopes []string) error
 	Grant(ctx context.Context, person string) (email string, token googleauth.Sealed, err error)
 	// Forget drops the person's token (disconnect, or Google refused it); it never revokes.
@@ -46,20 +47,22 @@ func Example() {
 	mux.HandleFunc("POST /api/google/connect", func(w http.ResponseWriter, r *http.Request) {
 		person, _ := identity.From(r.Context())
 		state := googleauth.NewState()
-		if err := db.SaveState(r.Context(), state, person.ID, time.Now().Add(googleauth.StateTTL)); err != nil {
-			http.Error(w, "try again", http.StatusInternalServerError)
-			return
-		}
 		hint := ""
 		if len(person.Emails) > 0 {
 			hint = person.Emails[0]
 		}
-		http.Redirect(w, r, google.AuthCodeURL(state, hint), http.StatusSeeOther)
+		consent, verifier := google.AuthCodeURL(state, hint)
+		if err := db.SaveState(r.Context(), state, verifier, person.ID, time.Now().Add(googleauth.StateTTL)); err != nil {
+			http.Error(w, "try again", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, consent, http.StatusSeeOther)
 	})
 	mux.HandleFunc("GET /api/google/callback", func(w http.ResponseWriter, r *http.Request) {
 		person, _ := identity.From(r.Context())
 		q := r.URL.Query()
-		if ok, err := db.TakeState(r.Context(), q.Get("state"), person.ID); err != nil || !ok {
+		verifier, err := db.TakeState(r.Context(), q.Get("state"), person.ID)
+		if err != nil || verifier == "" {
 			http.Redirect(w, r, "/settings?google=expired", http.StatusSeeOther)
 			return
 		}
@@ -67,7 +70,7 @@ func Example() {
 			http.Redirect(w, r, "/settings?google=cancelled", http.StatusSeeOther)
 			return
 		}
-		grant, err := google.Exchange(r.Context(), q.Get("code"))
+		grant, err := google.Exchange(r.Context(), q.Get("code"), verifier)
 		if errors.Is(err, googleauth.ErrMissingScopes) {
 			http.Redirect(w, r, "/settings?google=scopes", http.StatusSeeOther)
 			return
