@@ -1,9 +1,10 @@
 # gitleaks with its default rules; vendored modules (also the former reference-app/vendor in the
-# history) and the tests' obvious placeholder keys (…0123456789abcdef) are not secrets.
+# history) and the tests' obvious placeholder keys (…0123456789abcdef, and bytes 0x00..0x1f in
+# base64) are not secrets.
 [extend]
 useDefault = true
 
 [allowlist]
 description = "vendored code and placeholder test keys"
 paths = ['''(^|/)vendor/''']
-regexes = ['''0123456789abcdef''']
+regexes = ['''0123456789abcdef''', '''AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=''']
