@@ -1,3 +1,25 @@
+# Migrating to v1.8.0
+
+Compatible. New package `googleauth` for an app that connects a person's own Google account
+(`go doc googleauth`, the example shows connect, callback and a Google call):
+
+- Config: the OAuth client (Web application) with the app's callback as a redirect URI, the
+  scopes the app needs (`openid email` are added) and `OptionalScopes` it can do without. A
+  client shared with other apps keeps `IncludeGrantedScopes` off.
+- Store: the app's own tables. A state from `NewState` with the person, for `StateTTL`, taken
+  once in the callback; per person the three `Sealed` values, the account e-mail (`Grant.Email`,
+  the additional data `Open` needs) and the granted scopes. A token key of 32 random bytes in
+  base64 (`openssl rand -base64 32`) from a secret, read with `ParseKey` at startup.
+- Use: `Client.AccessToken(ctx, refresh)` before each Google call; the Client caches access tokens
+  per refresh token, so keep one Client per process. `ErrInvalidGrant` means the grant is gone:
+  forget the token and offer to connect again. Disconnecting forgets the token and never revokes it.
+
+An app with its own Google code (Omni, Paper) keeps its tables and key: `Key.Open(Sealed{ciphertext,
+iv, tag}, user_email)` opens the stored rows and `Seal` writes the same format, so nobody consents
+again. Its HMAC-signed state, token cache and refresh code go; its required scopes move to
+`Config.Scopes` (an optional one such as Paper's Gmail to `OptionalScopes`). An app whose client
+is shared with others drops its revoke on disconnect.
+
 # Migrating to v1.7.0
 
 Compatible. The `profile` module gets a menu; `ProfileCard` and `SettingsSheet` stay.

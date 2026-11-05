@@ -10,6 +10,7 @@ Small Go primitives for the platforms' first-party apps; a toolkit, not a framew
 - `server`: bounded `http.Server`, `Health` (/healthz), `Ready` (/readyz), graceful shutdown.
 - `sqlite`: bounded pure-Go SQLite (WAL, BEGIN IMMEDIATE), read-only, snapshots, forward-only migrations.
 - `web`: embedded SPA with cache rules, `PublicFiles` for /pwa/, security `Headers`.
+- `googleauth`: a person's Google grant (consent URL, code exchange, refresh token sealed in Omni's format, cached access tokens); storage stays in apps, never revoke.
 - `llm`, `memory`, `push`: clients; `frontendregistry`: frontend source installer; `appscaffold`: app generator.
 
 Composition, outermost first: `web.Headers` → probes → `access.Internal` routes → `web.PublicFiles(spa, gated)` → Access → `identity` (on `/api/`) → `/api/`, SPA.

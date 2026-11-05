@@ -18,6 +18,9 @@ The initial packages are:
 - `appscaffold`: a one-time repository-local Docker/CI/Helm scaffold generator.
 - `httpx`: opt-in request IDs, strict bounded JSON decoding, an explicit JSON API 404, and the
   standard `{"error":"..."}` shape with application-owned copy and status semantics.
+- `googleauth`: a person's own Google grant for an app: the consent URL, the code exchange that
+  names the account and checks the granted scopes, the refresh token sealed (AES-256-GCM) in the
+  format Omni and Paper store, and access tokens cached in memory with one refresh at a time.
 - `frontendregistry`: a checked source installer for the React/Vite template, the iOS-safe mobile shell (`pwa-shell`), same-origin JSON client,
   and PWA lifecycle; it shares no theme or layout.
 - `llm`: the portable LLM gateway client (completion, JSON-schema output, streaming with tools) and its `llmtest` fake.
@@ -116,6 +119,19 @@ ceiling and reasoning effort on every request, no backend-specific switches, no 
 never logged, and a disabled client (`ErrDisabled`) without a key so the app runs without
 inference. Prompts, schemas, tool loops, ceilings and caches stay in apps. Design and rollout:
 `docs/llm/shared-llm-client-proposal.md` in the workspace repository.
+
+**Google grants.** `googleauth` is the consent flow and token handling Omni and Paper each carried,
+on `golang.org/x/oauth2` (Google's endpoint from `endpoints`, not the `google` package, which would
+pull the Cloud metadata client into every consumer's vendor tree). The account comes from OpenID
+Connect userinfo, as in both apps, and must have a verified e-mail. The sealed format (ciphertext,
+nonce and tag in separate base64 values, the account's lower-case e-mail as additional data) is
+theirs, so they move over without a new consent; a test opens rows sealed by Omni's code and
+writes the same bytes. Several apps may share one OAuth client, hence: no revoke helper
+(revocation removes every scope the person granted to the Cloud project, for all its clients, so
+disconnecting only forgets the app's token), `include_granted_scopes` off by default (it would
+hand an app the others' scopes), and one refresh token per app and person (Google invalidates the
+oldest beyond its limit). Tokens and OAuth state stay in the app's own tables; scopes, copy and
+the Google REST calls stay in apps.
 
 ## Private-module consumption
 
