@@ -92,7 +92,10 @@ and shares concurrent lookups. Roles beyond owner/member/viewer and what they al
 from different moments. With `APP_SNAPSHOT_DIR` set (app-chart sets it to `<data>/.snapshots` for
 apps with persistence), every database opened writable also writes an integrity-checked online
 copy there every `APP_SNAPSHOT_INTERVAL` (1h) and keeps `APP_SNAPSHOT_KEEP` (2): the backup of the
-volume always holds a copy that opens cleanly (`sqlite/snapshots.go`, restore steps there).
+volume always holds a copy that opens cleanly (`sqlite/snapshots.go`, restore steps there). An
+interval counts from the pod's start, so a long one never fires in a pod that restarts more often;
+`APP_SNAPSHOT_AT=HH:MM` instead takes one a day at that local time (`TZ`), the first at its next
+occurrence: set it shortly before the volume backup. Setting both fails `Open`.
 
 **SQLite.** One open connection, WAL, a busy timeout, and `BEGIN IMMEDIATE` transactions: old and new
 pod share the file during a rolling update, and a deferred transaction that reads, sees the other

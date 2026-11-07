@@ -1,3 +1,16 @@
+# Migrating to v1.9.0
+
+Compatible; nothing changes without the new variable. `APP_SNAPSHOT_AT=HH:MM` (24h) takes the
+SQLite snapshots once a day at that local time instead of every `APP_SNAPSHOT_INTERVAL`: the first
+at its next occurrence after the start, then every day, so restarts no longer push it back. Set it
+a little before the nightly volume backup; `APP_SNAPSHOT_KEEP` (2) then keeps today's and
+yesterday's copy. Local time is `TZ` (without it usually UTC in a container); distroless static
+carries the zone data, an image without tzdata needs it installed or `import _ "time/tzdata"`.
+`sqlite.Open` fails on a time that is not strictly `HH:MM` (`2:15`, `24:00`), on
+`APP_SNAPSHOT_AT` together with `APP_SNAPSHOT_INTERVAL`, and, with `APP_SNAPSHOT_AT` set, on a `TZ` the binary cannot load.
+Explicit control: `SnapshotOptions.At`. A daily snapshot may take up to an hour; a failed one is
+logged and tried again the next day, the earlier snapshots stay.
+
 # Migrating to v1.8.0
 
 Compatible. New package `googleauth` for an app that connects a person's own Google account
