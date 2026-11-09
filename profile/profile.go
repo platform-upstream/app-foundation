@@ -74,8 +74,9 @@ type Handler struct {
 	apps   AppLister
 	// anyCaller: serve a profile from the Access e-mail even without a lookup.
 	anyCaller bool
-	once      sync.Once
-	err       error
+	// mu guards ready: the settings table exists.
+	mu    sync.Mutex
+	ready bool
 }
 
 // FromAccess serves a profile to any caller access.Middleware verified (named after the e-mail),
@@ -92,15 +93,23 @@ func New(db *sql.DB, photos Photos, prefix string) *Handler {
 
 var keyPattern = regexp.MustCompile(`^[a-z][a-zA-Z0-9_.-]{0,39}$`)
 
+// init creates the settings table on first use. Only a success is remembered: a first request
+// that fails (its client went away, the database was busy) leaves the next one to try again.
 func (h *Handler) init(ctx context.Context) error {
-	h.once.Do(func() {
-		_, h.err = h.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS person_settings (
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.ready {
+		return nil
+	}
+	if _, err := h.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS person_settings (
 			person_id  TEXT    PRIMARY KEY,
 			settings   TEXT    NOT NULL,
 			updated_at INTEGER NOT NULL
-		)`)
-	})
-	return h.err
+		)`); err != nil {
+		return err
+	}
+	h.ready = true
+	return nil
 }
 
 // Lookup lets the handler serve apps that do not run identity.Middleware yet (they gate by the
