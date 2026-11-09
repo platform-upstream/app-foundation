@@ -162,8 +162,11 @@ func (c *Cache) store(key string, e entry) {
 	c.entries[key] = e
 }
 
+// clone copies the slices of p, so a caller that changes its answer (sorts, appends, overwrites an
+// element) never changes the cached person the next request gets.
 func clone(p Person) Person {
 	p.Emails = append([]string{}, p.Emails...)
 	p.ActsFor = append([]string{}, p.ActsFor...)
+	p.Spaces = append([]Space{}, p.Spaces...)
 	return p
 }
