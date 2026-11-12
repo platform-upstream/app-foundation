@@ -70,6 +70,81 @@ are a starting point, not a shared theme.
   `.app-shell` height or position; floating elements use `--shell-nav-height`, not a hard-coded
   clearance. Only a real iPhone confirms the shell; desktop Chromium cannot reproduce the
   status bar and `lvh`/`dvh` behaviour.
+- `touch` (`src/foundation/touch.css`, `@layer foundation`, imported after `shell.css` and before
+  the app's CSS) is the touch floor proven by Console and Paper: on `(pointer: coarse)` fields at
+  `max(16px, 1em)` (iOS zooms into a smaller field and stays zoomed) and buttons, selects and
+  fields at least 44px high (checkboxes and radios take the finger through their label); on
+  controls no tap highlight and `touch-action: manipulation` (no double-tap delay, pinch zoom
+  stays); `text-size-adjust: 100%`; `.hit-target`, an invisible `::after` that grows a small chip
+  to 44 x 44 around its centre (the element must not use `::after` itself); and `.no-pan-x`
+  (`overflow-x: clip; overscroll-behavior-x: none`), which the app puts on `html`, `body` and the
+  scroller (`mainProps={{ className: 'no-pan-x' }}` on `AppShell`): without it on all three a
+  diagonal flick pans the page or swipes back in history. Rule that goes with it: never autofocus a
+  field on touch; the keyboard opens, `pwa-shell` takes it for typing and drops the nav (focus on
+  a tap, or only on `(pointer: fine)`). Unlayered app rules win over the layer, so a component
+  that sets a 14px field or a 32px button overrides the floor; `phone-audit` reports it. Press
+  feedback, sizes above the floor and every look value stay app-owned.
+- `motion` has no tokens: durations, easings, keyframes and distances are the app's look.
+  `motion.css` holds the reduced-motion policy (its header is the rule set: every movement under
+  `prefers-reduced-motion: no-preference`; never a global `!important` kill switch, because an
+  `!important` in an earlier cascade layer beats every later and unlayered `!important`, so a
+  kill switch in one layer silently defeats the app's reduced-motion fade in another; entrances
+  with fill-mode `backwards`; no `view-transition-name` on the scrolling page frame) and stops
+  view transitions under `reduce`. `motion.ts`: `prefersReducedMotion()`, `useReducedMotion()`
+  (follows the setting live), `useEntrance(ref, ready)` → `entering` for `data-entering` on a
+  list (true from the render in which the data first arrives until the animations under `ref`
+  finish, never again for that component: no entrance on a refetch or a filter),
+  `viewTransition(update)` (same-document view transition with the update flushed synchronously;
+  without the API, under `reduce` or on a hidden page it just runs the update; resolves when
+  done), `useSlidingIndicator(containerRef, selector, key, axis?)` → `{ style, instant }` (measures
+  the selected item, follows resizes and font loads; `instant` on the first placement, so the app
+  writes its transition as `.indicator:not([data-instant])`), plus `animationsSettled`,
+  `indicatorStyle`, `sameBox`. Never put `view-transition-name` on `.app-shell-main` or the page
+  column: it becomes a stacking context while named, and fixed overlays inside land under the bars
+  (Paper, Finance). Which way a page enters, FLIP lists and the keyframes stay app-owned.
+- `phone-audit` (`e2e/foundation/phone-audit.ts`, `e2e/foundation/phone-audit-tests.ts`) is the
+  phone check from Paper's overflow and pan scripts and Workbench's mobile spec, for Playwright.
+  It opens each route at 375x667 and 390x844 (touch, `isMobile`, `serviceWorkers: 'block'`,
+  `de-CH`) and reports structured findings (`check`, `selector`, `detail`, `text`):
+  `page-overflow`, `wide-element`, `sideways-pan` (real CDP touch swipes at three heights, both
+  ways: scroll, visual viewport, scroller, zoom or a history swipe), `text-overflow` (text outside
+  its control; ellipsis and line clamp pass), `number-split`, `tap-target` (44px, counting an
+  invisible `::before`/`::after`, inline links in text exempt), `input-font` (16px), `small-text`
+  (14px), `autofocus`, `layout-shift` (Layout Instability API in a refetch window), `axe`
+  (wcag2a/aa, 2.1 a/aa, 2.2 aa) and, in a pass with `reducedMotion: 'reduce'`,
+  `running-animation`. `sideways-pan` and `layout-shift` need Chromium; elsewhere they report
+  nothing. The app adds `@playwright/test` and `@axe-core/playwright` as devDependencies (or sets
+  `axe: false`), a Playwright config with its `baseURL` and server, and one spec it owns:
+
+  ```ts
+  // e2e/phone.spec.ts
+  import { forbidComputedStyle } from './foundation/phone-audit.ts';
+  import { phoneAudit } from './foundation/phone-audit-tests.ts';
+
+  phoneAudit({
+    setup: (page) => page.route('**/api/**', serveFixtures), // the app's own test data
+    routes: [
+      { path: '/', ready: (page) => page.getByRole('list').waitFor() },
+      { path: '/settings', options: { skip: ['layout-shift'] } },
+    ],
+    refetch: (page) => page.evaluate(() => window.dispatchEvent(new Event('focus'))),
+    platformRules: [forbidComputedStyle('no-glass', 'backdrop-filter')],
+  });
+  ```
+
+  Options: `skip` (check names), `ignore` (a selector whose subtree is not reported), `controls`
+  (the app's own control classes, judged like buttons), `scroller` (default `.app-shell-main`),
+  `minTarget`/`minInputFont`/`minText`, `axe: { tags, disableRules } | false`, `refetch` and
+  `refetchWindowMs` (default: a `visibilitychange` and a `focus` event, which refetch only stale
+  TanStack queries; serve changed data or invalidate for a real refetch), `maxLayoutShift`,
+  `viewports`, `locale`, `reducedMotion: false`. `platformRules` take a platform's own rules
+  (`{ name, run(page) → Finding[] }`, or `forbidComputedStyle(name, property, allowed?)`), so a
+  platform enforces its look decisions without putting them in the shared code. Apps with their
+  own specs use `auditPage`, `auditReducedMotion`, `installLayoutShiftObserver` (before
+  `page.goto`), `openRoute`, `phoneContextOptions` and `formatFindings` directly. The e2e files
+  import with `.ts` extensions, so an `e2e/tsconfig.json` that type-checks them sets
+  `allowImportingTsExtensions`. What Chromium cannot show (status bar, `lvh`, the keyboard,
+  pull-to-refresh on iOS) stays a short check on an iPhone.
 - `template` supplies only a clean React/Vite entry point, visible application-owned QueryClient
   policy, accessible document defaults, root-origin build configuration, PWA registration, and a
   minimal `AppShell` with a top bar and nav that tells adopters to create an application identity.

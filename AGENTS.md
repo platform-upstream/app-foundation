@@ -21,6 +21,9 @@ stay in apps; local auth only on literal `127.0.0.1` with a loopback peer; never
 
 Managed in apps: registry modules `api`, `pwa`, `pwa-shell`, `profile` (`check`/`sync`); `public/sw.js` is a template
 copy (apps extend `sw-app.js`); everything else the scaffold writes belongs to the app.
+UI mechanics modules (`touch`, `motion`, `phone-audit`) carry behaviour only, never look values (colours, radii,
+shadows, fonts, durations, nav look); CSS in `@layer foundation`, no `!important`. Their TS/JS tests run on Node with
+type stripping; `PHONE_AUDIT_PLAYWRIGHT=<path to the playwright package>` (and `CHROME`) runs the phone audit.
 
 Change: tests for changed behaviour; in WSL `go vet ./... && go test -race ./...` (Node runs the sw.js test);
 commit to `main` without attribution; CI green (go, minimum-go, scaffold). Release: SemVer (breaking = new
