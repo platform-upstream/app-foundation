@@ -19,6 +19,9 @@
     },
     "touch": {
       "description": "Touch ergonomics in @layer foundation: 16px fields and 44px controls on coarse pointers, no tap highlight or double-tap delay, text-size-adjust, .hit-target, opt-in .no-pan-x frame."
+    },
+    "motion": {
+      "description": "Reduced-motion policy (no tokens) plus prefersReducedMotion, useReducedMotion, useEntrance (first insert only), viewTransition with fallback, useSlidingIndicator."
     }
   },
   "files": [
@@ -40,6 +43,8 @@
     { "module": "template", "source": "sources/template/vite-env.d.ts", "target": "src/vite-env.d.ts" },
     { "module": "template", "source": "sources/template/App.tsx", "target": "src/App.tsx" },
     { "module": "template", "source": "sources/template/app.css", "target": "src/app.css" },
-    { "module": "touch", "source": "sources/touch/touch.css", "target": "src/foundation/touch.css" }
+    { "module": "touch", "source": "sources/touch/touch.css", "target": "src/foundation/touch.css" },
+    { "module": "motion", "source": "sources/motion/motion.css", "target": "src/foundation/motion.css" },
+    { "module": "motion", "source": "sources/motion/motion.ts", "target": "src/foundation/motion.ts" }
   ]
 }
