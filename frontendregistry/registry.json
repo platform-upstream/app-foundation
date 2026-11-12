@@ -22,6 +22,9 @@
     },
     "palette": {
       "description": "Command palette logic without a look: rank (umlaut and accent folding, aliases, fuzzy), recent picks, isTypingTarget and a keyboard shortcut handler with typing, dialog, AltGr and IME guards."
+    },
+    "scroll-edges": {
+      "description": "useScrollEdges marks a sideways scroller with data-more-start/end; .edge-fade fades those edges with a mask only (no colour)."
     }
   },
   "files": [
@@ -46,6 +49,8 @@
     { "module": "push", "source": "sources/push/sw-push.js", "target": "public/sw-push.js" },
     { "module": "push", "source": "sources/push/push.ts", "target": "src/foundation/push.ts" },
     { "module": "palette", "source": "sources/palette/palette.ts", "target": "src/foundation/palette.ts" },
-    { "module": "palette", "source": "sources/palette/shortcuts.ts", "target": "src/foundation/shortcuts.ts" }
+    { "module": "palette", "source": "sources/palette/shortcuts.ts", "target": "src/foundation/shortcuts.ts" },
+    { "module": "scroll-edges", "source": "sources/scroll-edges/scroll-edges.ts", "target": "src/foundation/scroll-edges.ts" },
+    { "module": "scroll-edges", "source": "sources/scroll-edges/scroll-edges.css", "target": "src/foundation/scroll-edges.css" }
   ]
 }
