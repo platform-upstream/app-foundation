@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { request } from '../../lib/api.js';
+import { toast } from '../../foundation/toast.js';
 import './notes.css';
 
 // The scaffold's example feature: a round trip through the API and SQLite. Replace it.
@@ -24,7 +25,11 @@ export function NotesPage() {
   });
   const remove = useMutation({
     mutationFn: (id: number) => request(`notes/${id}`, z.unknown(), { method: 'DELETE' }),
-    onSuccess: (_, id) => queryClient.setQueryData<Note[]>(['notes'], (old = []) => old.filter((n) => n.id !== id)),
+    onSuccess: (_, id) => {
+      queryClient.setQueryData<Note[]>(['notes'], (old = []) => old.filter((n) => n.id !== id));
+      toast('Note deleted');
+    },
+    onError: (error) => toast(error.message, { tone: 'error' }),
   });
 
   const submit = (event: FormEvent) => {

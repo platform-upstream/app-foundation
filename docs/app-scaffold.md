@@ -2,14 +2,15 @@
 
 `app-scaffold` renders a complete, deployable application into an empty repository: Go backend
 (Cloudflare Access, SQLite with migrations, security headers, public `/pwa/` files), the React/Vite
-frontend from the registry (`template`, `api`), a starting letter icon in the app colour, Dockerfile,
+frontend from the registry (`template` with `pwa`, `pwa-shell`, `touch` and `motion`, plus
+`api`, `sheet`, `toast` and `phone-audit`), a starting letter icon in the app colour, Dockerfile,
 `.ci/pipeline.yaml`, Helm chart and AGENTS.md. A notes feature runs through every layer as a
 working example. It renders once and refuses to replace anything; every file then belongs to the
 app. Generation rejects symlink parents and uses root-confined atomic writes.
 
 ```bash
 go env -w GOPRIVATE=github.com/platform-upstream/*
-go run github.com/platform-upstream/app-foundation/cmd/app-scaffold@v1.1.0 \
+go run github.com/platform-upstream/app-foundation/cmd/app-scaffold@vX.Y.Z \
   -platform ../platform-config/platform.json -target ./notes -name notes -title "Notes"
 cd notes && go mod tidy && go mod vendor
 ```
@@ -41,6 +42,15 @@ chart's `cfTeamDomain` is empty and required, set by the deployment wrapper. `-o
 - Routes: security headers → `/healthz`, `/readyz` → `web.PublicFiles` (`/pwa/` without a session) →
   Access middleware → `/api/` (same-origin mutations) and the SPA.
 - Migrations are additive, because old and new pod overlap during a release.
+- Phone-ready UI (handbook ADR 0005): `touch.css`, `motion.css`, `sheet.css` and `toast.css` are
+  imported after `shell.css` and before the app's CSS, `no-pan-x` sits on `html`, `body` and the
+  shell's `<main>`, nav items are 44px, a `ToastRegion` is mounted and the notes feature reports
+  deletes with `toast()`. `pnpm build && pnpm test:phone` runs the phone audit (375x667 and
+  390x844, then reduced motion) against `vite preview` of the build on port `-port` minus 2800,
+  with the API answered from fixtures in `web/e2e/phone.spec.ts`; `CHROME=<chromium binary>` uses
+  a browser other than Playwright's own. The Dockerfile checks `api`, `pwa`, `pwa-shell`, `touch`,
+  `motion`, `sheet`, `toast` and `phone-audit`; it does not run the audit (no browser in the
+  image).
 
 `TestGeneratedAppBuildsAndPassesItsTests` generates an app, points it at the checkout and runs its
 `go vet` and `go test`, so the templates cannot rot unnoticed.

@@ -31,7 +31,7 @@ func main() {
 	flag.StringVar(&options.ImageRepository, "image", "", "image repository without tag; default <registry>/<org>/<name>")
 	flag.StringVar(&options.Color, "color", "", "icon colour #rrggbb; default derived from the name")
 	flag.StringVar(&options.Lang, "lang", "", "document language; default en")
-	flag.IntVar(&options.Port, "port", 0, "local preview port (Vite: port-2900); default 8200-8299 from the name")
+	flag.IntVar(&options.Port, "port", 0, "local preview port (Vite: port-2900, phone audit: port-2800); default 8200-8299 from the name")
 	flag.StringVar(&options.FoundationVersion, "foundation", ownVersion(), "app-foundation release to pin")
 	flag.Parse()
 	if flag.NArg() != 0 || options.Name == "" {

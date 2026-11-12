@@ -1,3 +1,26 @@
+# Migrating to v1.14.0
+
+Compatible for the code. New apps from `app-scaffold` start phone-ready (`docs/app-scaffold.md`).
+
+- `template` now requires `touch` and `motion`: `install`/`sync -modules template` also brings
+  `src/foundation/touch.css`, `motion.css` and `motion.ts`. Add `touch,motion` to the Dockerfile's
+  `check` list.
+- Apps on `template` that sync its files (all app-owned, so review the diff and keep your own
+  look): `src/main.tsx` imports `./foundation/touch.css` and `./foundation/motion.css` after
+  `shell.css`, before `app.css`; `index.html` has `class="no-pan-x"` on `<html>` and `<body>`;
+  `App.tsx` passes `className: 'no-pan-x'` in `mainProps`; `app.css` makes `.bottom-nav a` a 44px
+  flex target (nav padding top 0.25rem instead of 0.75rem) and drops its own 16px field rule
+  (`touch.css` has it on touch screens); `package.json` adds `@playwright/test` 1.65.0,
+  `@axe-core/playwright` 4.14.0 and `"test:phone": "playwright test"`, with `pnpm-lock.yaml` to
+  match. An app with its own nav makes its items 44px itself; the phone audit shows which.
+- `toast`: `<ToastRegion label="…">` renders `role="region"` with the label (an `aria-label`
+  without a role fails axe's `aria-prohibited-attr`, which the phone audit reports). `check` fails
+  for `toast` until `sync -modules toast` is run.
+- To give an existing scaffolded app the scaffold's phone audit: `install -modules phone-audit`
+  (plus `sheet,toast` if wanted), copy `web/playwright.config.ts` (set the port) and
+  `web/e2e/phone.spec.ts` from a fresh scaffold, adapt the fixtures and routes, add the modules to
+  the `check` list and `web/test-results/`, `web/playwright-report/` to `.gitignore`.
+
 # Migrating to v1.13.0
 
 Compatible for the code; the registry gains files, so the pin bump fails `check` for `api`,

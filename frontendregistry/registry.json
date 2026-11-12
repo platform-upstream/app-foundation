@@ -23,8 +23,8 @@
       "description": "Headless toast store (queue, durations, undo, pause, status/alert) and an unstyled ToastRegion in the top layer above the nav; look app-owned."
     },
     "template": {
-      "description": "Minimal React/Vite application with app-owned content, theme, query policy, top bar and nav on the shared shell.",
-      "requires": ["pwa", "pwa-shell"]
+      "description": "Minimal React/Vite application with app-owned content, theme, query policy, top bar and nav on the shared shell, touch and motion foundations, 44px nav targets and no sideways pan.",
+      "requires": ["pwa", "pwa-shell", "touch", "motion"]
     },
     "push": {
       "description": "Web Push: sw-push.js for the app's sw-app.js (checked payload, tag per subject, app badge, same-origin click that focuses before it navigates) and usePush/setAppBadge on the page."

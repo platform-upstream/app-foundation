@@ -77,7 +77,7 @@ func TestTemplateIncludesRequiredPWAModule(t *testing.T) {
 	if err := registry.Install(target, "template"); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"package.json", "public/sw.js", "src/foundation/register-service-worker.ts", "src/foundation/shell.css", "src/foundation/AppShell.tsx", "src/foundation/viewport.ts"} {
+	for _, name := range []string{"package.json", "public/sw.js", "src/foundation/register-service-worker.ts", "src/foundation/shell.css", "src/foundation/AppShell.tsx", "src/foundation/viewport.ts", "src/foundation/touch.css", "src/foundation/motion.css", "src/foundation/motion.ts"} {
 		if _, err := os.Stat(filepath.Join(target, filepath.FromSlash(name))); err != nil {
 			t.Fatalf("required template file %q: %v", name, err)
 		}
@@ -98,6 +98,34 @@ func TestTemplateIncludesRequiredPWAModule(t *testing.T) {
 		}
 		if !strings.Contains(string(contents), required) {
 			t.Fatalf("%s does not contain root-origin contract %q", name, required)
+		}
+	}
+}
+
+// The template passes the phone audit as installed: no sideways pan on html, body and the scroller,
+// foundation CSS before the app's, 44px nav items.
+func TestTemplateIsPhoneReady(t *testing.T) {
+	registry, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := t.TempDir()
+	if err := registry.Install(target, "template"); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range [][2]string{
+		{"index.html", `<html lang="en" class="no-pan-x">`},
+		{"index.html", `<body class="no-pan-x">`},
+		{"src/App.tsx", "className: 'no-pan-x'"},
+		{"src/main.tsx", "import './foundation/shell.css';\nimport './foundation/touch.css';\nimport './foundation/motion.css';\nimport './app.css';"},
+		{"src/app.css", "min-height: 44px;"},
+	} {
+		contents, err := os.ReadFile(filepath.Join(target, filepath.FromSlash(want[0])))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(contents), want[1]) {
+			t.Errorf("%s does not contain %q", want[0], want[1])
 		}
 	}
 }

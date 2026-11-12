@@ -33,3 +33,13 @@ button:disabled { opacity: 0.5; cursor: default; }
 .notes li button { background: transparent; color: #b42318; padding: 0.4rem 0.6rem; }
 .muted { color: #5b6478; }
 .error { color: #b42318; }
+/* Toasts (registry toast places them above the nav; their look is the app's). */
+.toast {
+  margin: 0 1rem 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: #172033;
+  color: #ffffff;
+  box-shadow: 0 4px 16px rgb(23 32 51 / 0.2);
+}
+.toast[data-tone='error'] { background: #b42318; }

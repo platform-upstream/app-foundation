@@ -9,8 +9,6 @@
 * { box-sizing: border-box; }
 body { min-width: 320px; font-size: 17px; }
 button, input, textarea, select { font: inherit; }
-/* iOS zooms into a focused field under 16px and does not zoom back out. */
-input, textarea, select { font-size: max(16px, 1em); }
 :focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
 
 /* Top bar: carries the page title. It pads the safe area too, so switching index.html to the
@@ -27,11 +25,22 @@ input, textarea, select { font-size: max(16px, 1em); }
 .bottom-nav {
   display: flex;
   justify-content: space-around;
-  padding: 0.75rem 1rem var(--shell-safe-bottom);
+  padding: 0.25rem 1rem var(--shell-safe-bottom);
   background: #ffffff;
   border-top: 1px solid #e3e6ee;
 }
-.bottom-nav a { color: inherit; font-weight: 600; text-decoration: none; }
+/* Each item is a 44px target (the phone audit's floor), not just its text. */
+.bottom-nav a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 1rem;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
 /* From 768px a sidebar (AppShell `sidebar`) takes over navigation; add one before hiding the nav
    for good. `.app-layout` is the desktop row next to that sidebar. */
 @media (min-width: 768px) {
