@@ -37,7 +37,10 @@ assert.equal(p.pullEnabled(win(['(display-mode: standalone)'])), false, 'a deskt
 // Off while a dialog is open.
 assert.equal(p.dialogOpen({ querySelector: () => null }), false);
 assert.equal(p.dialogOpen({ querySelector: (s) => (s === 'dialog:modal' ? {} : null) }), true);
-assert.equal(p.dialogOpen({ querySelector: (s) => (s === '[aria-modal="true"]' ? {} : null) }), true);
+const only = (match) => ({ querySelector: (s) => (s.split(', ').includes(match) ? {} : null) });
+assert.equal(p.dialogOpen(only('[aria-modal="true"]')), true);
+assert.equal(p.dialogOpen(only('[role="dialog"][data-state="open"]')), true, 'an open Radix dialog');
+assert.equal(p.dialogOpen(only('[role="alertdialog"][data-state="open"]')), true, 'an open Radix alert dialog');
 assert.equal(p.dialogOpen({ querySelector: (s) => { if (s.includes(':modal')) throw new SyntaxError(); return s === 'dialog[open]' ? {} : null; } }), true, 'old engines without :modal');
 
 // The gesture on a fake scroller: passive listeners only, one finger, from the top.
