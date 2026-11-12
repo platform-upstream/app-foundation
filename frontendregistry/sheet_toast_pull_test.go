@@ -30,6 +30,10 @@ func TestSheetLogic(t *testing.T) { runNodeTSTest(t, "sheet_test.mjs", "sheet/sh
 
 func TestToastStore(t *testing.T) { runNodeTSTest(t, "toast_test.mjs", "toast/toast.ts") }
 
+func TestPullToRefreshLogic(t *testing.T) {
+	runNodeTSTest(t, "pull_test.mjs", "pull-refresh/pull.ts")
+}
+
 // Mechanics modules carry no look: their CSS sits in the foundation layer (app rules win) and
 // sets no colour, radius, shadow, font or backdrop; only resets of the UA popover/dialog box.
 func TestSheetToastPullCSSIsLookNeutral(t *testing.T) {
@@ -59,8 +63,9 @@ func TestSheetToastPullInstall(t *testing.T) {
 		t.Fatal(err)
 	}
 	modules := map[string][]string{
-		"sheet": {"src/foundation/sheet.ts", "src/foundation/useSheet.ts", "src/foundation/sheet.css"},
-		"toast": {"src/foundation/toast.ts", "src/foundation/ToastRegion.tsx", "src/foundation/toast.css"},
+		"sheet":        {"src/foundation/sheet.ts", "src/foundation/useSheet.ts", "src/foundation/sheet.css"},
+		"toast":        {"src/foundation/toast.ts", "src/foundation/ToastRegion.tsx", "src/foundation/toast.css"},
+		"pull-refresh": {"src/foundation/pull.ts", "src/foundation/usePullToRefresh.ts"},
 	}
 	for module, files := range modules {
 		target := t.TempDir()
@@ -77,7 +82,7 @@ func TestSheetToastPullInstall(t *testing.T) {
 		}
 	}
 	// The cores must not need React, so apps without it can use them.
-	for _, core := range []string{"sources/sheet/sheet.ts", "sources/toast/toast.ts"} {
+	for _, core := range []string{"sources/sheet/sheet.ts", "sources/toast/toast.ts", "sources/pull-refresh/pull.ts"} {
 		raw, err := content.ReadFile(core)
 		if err != nil {
 			t.Fatal(err)
