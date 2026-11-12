@@ -78,7 +78,8 @@ export function phoneAudit(config: PhoneAuditConfig): void {
   if (!reducedMotion) return;
   const last = viewports[viewports.length - 1];
   test.describe(`phone ${last.name} reduced motion`, () => {
-    test.use({ ...phoneContextOptions(last, locale ? { locale } : {}), reducedMotion: 'reduce' });
+    // reducedMotion is a context option, not a test fixture: it goes through contextOptions.
+    test.use({ ...phoneContextOptions(last, locale ? { locale } : {}), contextOptions: { reducedMotion: 'reduce' } });
     for (const route of routes) {
       test(route.name ?? route.path, async ({ page }) => {
         await open(page, config, route, false);
