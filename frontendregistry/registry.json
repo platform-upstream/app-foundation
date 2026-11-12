@@ -19,6 +19,9 @@
     },
     "push": {
       "description": "Web Push: sw-push.js for the app's sw-app.js (checked payload, tag per subject, app badge, same-origin click that focuses before it navigates) and usePush/setAppBadge on the page."
+    },
+    "palette": {
+      "description": "Command palette logic without a look: rank (umlaut and accent folding, aliases, fuzzy), recent picks, isTypingTarget and a keyboard shortcut handler with typing, dialog, AltGr and IME guards."
     }
   },
   "files": [
@@ -41,6 +44,8 @@
     { "module": "template", "source": "sources/template/App.tsx", "target": "src/App.tsx" },
     { "module": "template", "source": "sources/template/app.css", "target": "src/app.css" },
     { "module": "push", "source": "sources/push/sw-push.js", "target": "public/sw-push.js" },
-    { "module": "push", "source": "sources/push/push.ts", "target": "src/foundation/push.ts" }
+    { "module": "push", "source": "sources/push/push.ts", "target": "src/foundation/push.ts" },
+    { "module": "palette", "source": "sources/palette/palette.ts", "target": "src/foundation/palette.ts" },
+    { "module": "palette", "source": "sources/palette/shortcuts.ts", "target": "src/foundation/shortcuts.ts" }
   ]
 }
