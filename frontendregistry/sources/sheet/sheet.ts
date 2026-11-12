@@ -8,7 +8,6 @@
 // the rest of the page inert, keeps Tab inside, and sends Escape only to the topmost modal.
 
 const SCROLLER = '.app-shell-main';
-const FIELD = 'input:not([type=button]):not([type=submit]):not([type=checkbox]):not([type=radio]), textarea, select, [contenteditable]:not([contenteditable=false])';
 const NO_DRAG = 'button, a[href], input, select, textarea, label, [contenteditable]:not([contenteditable=false]), [data-sheet-no-drag]';
 
 interface Lock {
@@ -110,18 +109,15 @@ export function showSheet(dialog: HTMLDialogElement, options: SheetOptions = {})
   stack.push(dialog);
   dialog.setAttribute('data-sheet', '');
 
+  // showModal focuses the first focusable element. On a touch screen that may be a field (the
+  // keyboard comes up, pwa-shell hides the nav) or a button with a focus ring: the dialog itself
+  // takes the focus there, in the same task, before anything is painted.
   const touch = matchMedia('(pointer: coarse)').matches;
   const ownFocus = touch && !dialog.querySelector('[autofocus]');
   const hadTabIndex = dialog.hasAttribute('tabindex');
-  if (ownFocus) {
-    if (!hadTabIndex) dialog.tabIndex = -1;
-    dialog.setAttribute('autofocus', '');
-  }
+  if (ownFocus && !hadTabIndex) dialog.tabIndex = -1;
   if (!dialog.open) dialog.showModal();
-  if (ownFocus) {
-    dialog.removeAttribute('autofocus');
-    if (document.activeElement !== dialog && document.activeElement?.matches(FIELD)) dialog.focus({ preventScroll: true });
-  }
+  if (ownFocus) dialog.focus({ preventScroll: true });
 
   let done = false;
   function cleanup() {
