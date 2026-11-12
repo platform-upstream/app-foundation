@@ -32,6 +32,22 @@ Nothing behaves differently until the app uses them (`docs/frontend-registry.md`
 - `pwa-shell`: a nav count becomes `<span className="nav-badge-anchor"><Icon />
   <NavBadge count={n} label={…} /></span>`; the app keeps the badge's background, colour, radius
   and ring on `.nav-badge` (and `[data-tone]`), and drops its own positioning rules.
+- New modules `sheet`, `toast`, `pull-refresh`: `go tool frontend-registry install -target .
+  -modules sheet,toast,pull-refresh`, then add them to the Dockerfile's `check`. Details and
+  examples: `docs/frontend-registry.md`.
+  - `sheet`: import `src/foundation/sheet.css` after `shell.css`. Move the app's sheet onto a native
+    `<dialog>` with `useSheet(ref, open, onClose)`; mark grabber and header `data-sheet-handle` and add
+    `useSheetDrag(ref, { onClose, below })`. Delete the app's own portal, scrim element (style
+    `::backdrop` instead), Escape listener, focus trap and focus restore, and every scroll lock on
+    `body` (`lockScroll()` for other overlays). Keep the look; drop bottom padding that only cleared
+    the home indicator (the spacer does it now) and inline drag transforms (`--sheet-drag` is applied
+    as `translate`).
+  - `toast`: import `toast.css`, render `<ToastRegion>` once and call `toast(text, { undo, tone })`
+    where the app's own store was; `configureToasts({ undoLabel })` for the app's copy. Delete the
+    app's store and region and any bottom offset that adds `env(safe-area-inset-bottom)` to
+    `--shell-nav-height`.
+  - `pull-refresh`: `usePullToRefresh(mainRef, refresh)` on `AppShell`'s `mainProps.ref` and the
+    app's indicator from `{ pull, ready, busy }`; delete the app's own touch handling.
 
 # Migrating to v1.10.0
 

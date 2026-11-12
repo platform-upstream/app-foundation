@@ -24,6 +24,9 @@ copy (apps extend `sw-app.js`); everything else the scaffold writes belongs to t
 Also `push`, `palette`, `scroll-edges`: look-neutral mechanics only (handbook 0005), never colours,
 radii, shadows or fonts; their Node tests (`frontendregistry/testdata/*_test.mjs`) need Node 22.18+.
 `public/sw-push.js` and `public/profile-theme.js` are module files (checked), unlike `public/sw.js`.
+UI mechanics `sheet`, `toast`, `pull-refresh` (handbook ADR 0005): behaviour only, cores without React, CSS in
+`@layer foundation` with no look values (a test checks); TS logic tests need Node 22.18+, the browser run is
+`frontendregistry/testdata/mechanics_e2e.mjs`.
 
 Change: tests for changed behaviour; in WSL `go vet ./... && go test -race ./...` (Node runs the sw.js test);
 commit to `main` without attribution; CI green (go, minimum-go, scaffold). Release: SemVer (breaking = new

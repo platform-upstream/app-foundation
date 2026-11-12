@@ -13,6 +13,15 @@
     "profile": {
       "description": "The signed-in person bottom left (photo from directory) opening a menu: de/en, light/dark, the app's own settings and the person's other apps; backend: Go package profile at /api/me; public/profile-theme.js sets the stored theme before the first paint and keeps the theme-color meta in step."
     },
+    "pull-refresh": {
+      "description": "usePullToRefresh on the shell's scroller: standalone touch only, from the top, sideways swipes ignored, damping, threshold, minimum spin, off while a dialog is open; indicator app-owned."
+    },
+    "sheet": {
+      "description": "Bottom-sheet behaviour on a native <dialog>: top layer, scroll lock on the shell's scroller, safe area, Escape for the topmost, focus back to the opener, drag down to close; look app-owned."
+    },
+    "toast": {
+      "description": "Headless toast store (queue, durations, undo, pause, status/alert) and an unstyled ToastRegion in the top layer above the nav; look app-owned."
+    },
     "template": {
       "description": "Minimal React/Vite application with app-owned content, theme, query policy, top bar and nav on the shared shell.",
       "requires": ["pwa", "pwa-shell"]
@@ -38,6 +47,14 @@
     { "module": "profile", "source": "sources/profile/profile.tsx", "target": "src/foundation/profile.tsx" },
     { "module": "profile", "source": "sources/profile/profile.css", "target": "src/foundation/profile.css" },
     { "module": "profile", "source": "sources/profile/profile-theme.js", "target": "public/profile-theme.js" },
+    { "module": "pull-refresh", "source": "sources/pull-refresh/pull.ts", "target": "src/foundation/pull.ts" },
+    { "module": "pull-refresh", "source": "sources/pull-refresh/usePullToRefresh.ts", "target": "src/foundation/usePullToRefresh.ts" },
+    { "module": "sheet", "source": "sources/sheet/sheet.ts", "target": "src/foundation/sheet.ts" },
+    { "module": "sheet", "source": "sources/sheet/useSheet.ts", "target": "src/foundation/useSheet.ts" },
+    { "module": "sheet", "source": "sources/sheet/sheet.css", "target": "src/foundation/sheet.css" },
+    { "module": "toast", "source": "sources/toast/toast.ts", "target": "src/foundation/toast.ts" },
+    { "module": "toast", "source": "sources/toast/ToastRegion.tsx", "target": "src/foundation/ToastRegion.tsx" },
+    { "module": "toast", "source": "sources/toast/toast.css", "target": "src/foundation/toast.css" },
     { "module": "template", "source": "sources/pwa/sw.js", "target": "public/sw.js" },
     { "module": "template", "source": "sources/template/package.json", "target": "package.json" },
     { "module": "template", "source": "sources/template/pnpm-lock.yaml", "target": "pnpm-lock.yaml" },

@@ -1,0 +1,51 @@
+/* Bottom-sheet placement (app-foundation registry module `sheet`). Registry-owned: do not edit
+   in an application. Only position, safe areas and the drag offset: background, colour, radius,
+   shadow, padding, the grabber's look and the animations in and out belong to the application.
+   Import after shell.css and before the application's CSS; unlayered app rules win, e.g. a
+   centred dialog from a breakpoint on: dialog.my-sheet { inset: 0; margin: auto; width: 640px; } */
+@layer foundation {
+  /* showSheet sets data-sheet. At the bottom edge, full width, never under the status bar. */
+  dialog[data-sheet] {
+    position: fixed;
+    inset: auto 0 0 0;
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px));
+    box-sizing: border-box;
+    border: 0;
+    padding: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* The drag offset uses `translate`, not `transform`, so the app's own transforms and keyframes
+       keep working. */
+    translate: 0 var(--sheet-drag, 0px);
+  }
+
+  /* The home indicator always gets its room, with or without a footer and whatever padding the
+     app gives the sheet: a spacer after the last child (a flex item in a flex sheet). */
+  dialog[data-sheet]::after {
+    content: '';
+    display: block;
+    flex: none;
+    height: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Handles take the vertical gesture themselves. */
+  dialog[data-sheet] [data-sheet-handle] {
+    touch-action: none;
+  }
+
+  dialog[data-sheet][data-dragging] {
+    transition: none;
+    user-select: none;
+  }
+
+  /* Settling back and sliding out after a drag. Duration and easing may be overridden by the app;
+     without a transition the sheet jumps and closes at once. */
+  @media (prefers-reduced-motion: no-preference) {
+    dialog[data-sheet]:not([data-dragging]) {
+      transition: translate 0.2s ease-out;
+    }
+  }
+}
