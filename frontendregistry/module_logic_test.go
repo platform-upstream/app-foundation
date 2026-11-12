@@ -86,3 +86,37 @@ func TestLookNeutralEdgeFadeAndNavBadge(t *testing.T) {
 		}
 	}
 }
+
+// The compact profile button is a 44px target (a 32px photo plus 6px padding) and its accessible
+// name contains the initials it shows (axe label-content-name-mismatch); the full card names
+// itself through its text. Rendering it (React, a bundler, axe in Chromium) is not part of go test.
+func TestProfileButtonTargetAndName(t *testing.T) {
+	raw, err := content.ReadFile("sources/profile/profile.tsx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tsx := string(raw)
+	if got := strings.Count(tsx, "aria-label={profileButtonLabel(t('profile."); got != 2 {
+		t.Fatalf("both profile buttons must take their label from profileButtonLabel, got %d", got)
+	}
+	if !strings.Contains(tsx, "if (!compact) return undefined;") || !strings.Contains(tsx, "person.photo ? '' : `, ${initials(person.name)}`") {
+		t.Fatal("profileButtonLabel must leave the full card unlabelled and add the visible initials")
+	}
+	if got := strings.Count(tsx, `<span className="pf-sr">`); got != 2 {
+		t.Fatalf("the full card needs its visually hidden purpose in both buttons, got %d", got)
+	}
+	if strings.Count(tsx, "size={compact ? 32 : 36}") != 2 {
+		t.Fatal("the compact avatar size changed: recheck the 44px target")
+	}
+	css, err := content.ReadFile("sources/profile/profile.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	compact := regexp.MustCompile(`\.pf-card\.pf-compact \{[^}]*padding: (\d+)px`).FindStringSubmatch(string(css))
+	if compact == nil {
+		t.Fatal("no padding on .pf-card.pf-compact")
+	}
+	if padding := compact[1]; padding != "6" {
+		t.Fatalf("compact padding %spx: 32px + 2 x padding must be at least 44px", padding)
+	}
+}

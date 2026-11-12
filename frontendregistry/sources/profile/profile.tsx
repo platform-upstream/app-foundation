@@ -258,6 +258,18 @@ export function Avatar({ name, photo, size = 36 }: { name: string; photo: string
   return <span className="pf-avatar pf-initials" style={{ width: size, height: size, fontSize: Math.round(size * 0.38) }} aria-hidden="true">{initials(name)}</span>;
 }
 
+/**
+ * The accessible name of the profile button. The full card names itself through its visible text
+ * (name and role, after a visually hidden `what`), so it needs no label. The compact one shows
+ * only the photo or the initials: its label is `what: name`, plus the initials when they are what
+ * is on screen, since an accessible name must contain the visible text (WCAG 2.5.3, axe
+ * label-content-name-mismatch).
+ */
+export function profileButtonLabel(what: string, person: { name: string; photo: string }, compact: boolean): string | undefined {
+  if (!compact) return undefined;
+  return `${what}: ${person.name}${person.photo ? '' : `, ${initials(person.name)}`}`;
+}
+
 /** Bottom left of the sidebar (desktop) and the top bar (phones, compact): photo, name, role. A
  *  click opens the settings. */
 export function ProfileCard({ compact = false, onOpen }: { compact?: boolean; onOpen: () => void }) {
@@ -267,10 +279,11 @@ export function ProfileCard({ compact = false, onOpen }: { compact?: boolean; on
   const sub = profile.actor ? t('profile.actingFor', { name: profile.name }) : t(`profile.role.${profile.role}`);
   const shown = profile.actor ? { name: profile.actor.name, photo: '' } : profile;
   return (
-    <button type="button" className={`pf-card${compact ? ' pf-compact' : ''}`} onClick={onOpen} aria-label={`${t('profile.settings')}: ${shown.name}`}>
+    <button type="button" className={`pf-card${compact ? ' pf-compact' : ''}`} onClick={onOpen} aria-label={profileButtonLabel(t('profile.settings'), shown, compact)}>
       <Avatar name={shown.name} photo={shown.photo} size={compact ? 32 : 36} />
       {!compact && (
         <span className="pf-text">
+          <span className="pf-sr">{t('profile.settings')}: </span>
           <b>{shown.name}</b>
           <span>{sub}</span>
         </span>
@@ -469,9 +482,9 @@ export function ProfileMenu({ sections = [], compact = false, apps = true }: { s
   return (
     <div ref={wrap} className={`pf-menu-wrap${compact ? ' pf-compact-wrap' : ''}`}>
       <button ref={trigger} type="button" className={`pf-card${compact ? ' pf-compact' : ''}${open ? ' pf-open' : ''}`}
-        aria-haspopup="dialog" aria-expanded={open} aria-label={`${t('profile.menu')}: ${shown.name}`} onClick={() => setOpen((o) => !o)}>
+        aria-haspopup="dialog" aria-expanded={open} aria-label={profileButtonLabel(t('profile.menu'), shown, compact)} onClick={() => setOpen((o) => !o)}>
         <Avatar name={shown.name} photo={shown.photo} size={compact ? 32 : 36} />
-        {!compact && <span className="pf-text"><b>{shown.name}</b><span>{sub}</span></span>}
+        {!compact && <span className="pf-text"><span className="pf-sr">{t('profile.menu')}: </span><b>{shown.name}</b><span>{sub}</span></span>}
         {!compact && <span className="pf-chev" aria-hidden="true"><Glyph d={<path d="M8 10l4-4 4 4M8 14l4 4 4-4" />} size={16} /></span>}
       </button>
       {open && createPortal(
