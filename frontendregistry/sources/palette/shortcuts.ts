@@ -28,6 +28,10 @@ export interface ShortcutOptions {
   /** Combinations with the platform's primary modifier (⌘ on Apple, Ctrl elsewhere), by lower-case
    *  key: { k: openPalette }. They also work in a text field, never with Alt (AltGr) held. */
   primary?: Record<string, ShortcutAction>;
+  /** Also fire `primary` combinations from inside a dialog (default false), so ⌘K/Ctrl+K closes the
+   *  open palette again. Single keys and go sequences stay off in dialogs. An action that does not
+   *  apply in a dialog returns false. */
+  primaryInDialog?: boolean;
   /** The key that starts a go sequence (default 'g'). */
   goKey?: string;
   /** How long a `goKey` waits for its letter, in ms (default 1500). */
@@ -84,10 +88,13 @@ function altHeld(event: ShortcutKey): boolean {
  * A keydown handler with the go sequence's memory. It returns whether it took the key; the caller
  * then calls preventDefault. Left alone: keys during IME composition, keys already handled, keys
  * typed into a field, keys inside or behind an open dialog, and anything with Ctrl, ⌘ or Alt held
- * (except the `primary` combinations, which never fire with Alt).
+ * (except the `primary` combinations, which never fire with Alt, and inside a dialog only with
+ * `primaryInDialog`).
  *
  *   const handle = createShortcutHandler({ keys: { '/': focusSearch }, go: { i: () => navigate('/inbox') } });
  *   window.addEventListener('keydown', (e) => { if (handle(e)) e.preventDefault(); });
+ *
+ * A palette that ⌘K/Ctrl+K opens and closes again: `primary: { k: togglePalette }, primaryInDialog: true`.
  */
 export function createShortcutHandler(options: ShortcutOptions) {
   const { keys = {}, go = {}, primary = {}, goKey = 'g', timeout = 1500, now = Date.now } = options;
@@ -102,7 +109,7 @@ export function createShortcutHandler(options: ShortcutOptions) {
     const primaryHeld = apple ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
     if (event.ctrlKey || event.metaKey || alt) {
       goSince = 0;
-      if (!primaryHeld || alt || inDialog(event.target)) return false;
+      if (!primaryHeld || alt || (inDialog(event.target) && !options.primaryInDialog)) return false;
       return run(primary[event.key.toLowerCase()]);
     }
     if (isTypingTarget(event.target) || inDialog(event.target) || dialogOpen()) {

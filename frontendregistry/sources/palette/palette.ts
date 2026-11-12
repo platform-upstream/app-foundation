@@ -85,12 +85,17 @@ export function score(item: Rankable, query: string): number {
   return f > 0 && q.length > 1 ? TIER.fuzzy + (f / 100) * 99 : 0;
 }
 
-/** The matching items, best first; equal scores keep their given order. */
-export function rank<T extends Rankable>(items: readonly T[], query: string): T[] {
+/**
+ * The matching items, best first; equal scores keep their given order. `tieBreak` orders items
+ * that match equally well (the same tier, as `Math.floor(score)`) before the shorter-label rule:
+ * `(a, b) => Number(b.active) - Number(a.active)` puts active items first among equals. When it
+ * returns 0, the shorter label and then the given order decide.
+ */
+export function rank<T extends Rankable>(items: readonly T[], query: string, tieBreak?: (a: T, b: T) => number): T[] {
   return items
     .map((item, index) => ({ item, index, s: score(item, query) }))
     .filter((entry) => entry.s > 0)
-    .sort((a, b) => b.s - a.s || a.index - b.index)
+    .sort((a, b) => Math.floor(b.s) - Math.floor(a.s) || (tieBreak ? tieBreak(a.item, b.item) : 0) || b.s - a.s || a.index - b.index)
     .map((entry) => entry.item);
 }
 
