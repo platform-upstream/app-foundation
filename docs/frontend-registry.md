@@ -21,6 +21,14 @@ Consumers run `check` for the modules they installed in their Dockerfile's Go st
 the update train verifies), with the registry targets copied into that stage. A pin bump that
 changes registry files fails it until `sync` is run and its diff reviewed.
 
+A pin bump resolves the private module, on any machine: `go env -w
+GOPRIVATE=github.com/platform-upstream/*` and a git credential helper for github.com (for example
+`git config --global credential.https://github.com.helper '!gh auth git-credential'`). GOPRIVATE
+implies `GONOSUMDB`, but an environment that sets `GONOPROXY` or `GONOSUMDB` itself replaces that
+default and asks sum.golang.org, where a private tag (or a fresh one) is missing (`verifying
+module: … not found`): set `GONOSUMDB=github.com/platform-upstream/*` as well. Then `go get -tool github.com/platform-upstream/app-foundation/cmd/frontend-registry@vX.Y.Z
+&& go mod vendor`, `sync` for the installed modules and review the diff.
+
 `install` writes missing files but refuses to replace a changed target. `check` exits non-zero and
 lists missing or changed registry-owned files. `sync` is the explicit replacement operation; review
 its diff because it overwrites selected registry-owned source. Selecting `template` automatically
@@ -76,7 +84,8 @@ are a starting point, not a shared theme.
   fields at least 44px high (checkboxes and radios take the finger through their label); on
   controls no tap highlight and `touch-action: manipulation` (no double-tap delay, pinch zoom
   stays); `text-size-adjust: 100%`; `.hit-target`, an invisible `::after` that grows a small chip
-  to 44 x 44 around its centre (the element must not use `::after` itself); and `.no-pan-x`
+  to 44 x 44 around its centre (the element must not use `::after` itself; a `.hit-target` gets no
+  44px `min-height`, so it keeps its own look); and `.no-pan-x`
   (`overflow-x: clip; overscroll-behavior-x: none`), which the app puts on `html`, `body` and the
   scroller (`mainProps={{ className: 'no-pan-x' }}` on `AppShell`): without it on all three a
   diagonal flick pans the page or swipes back in history. Rule that goes with it: never autofocus a
@@ -91,9 +100,11 @@ are a starting point, not a shared theme.
   kill switch in one layer silently defeats the app's reduced-motion fade in another; entrances
   with fill-mode `backwards`; no `view-transition-name` on the scrolling page frame) and stops
   view transitions under `reduce`. `motion.ts`: `prefersReducedMotion()`, `useReducedMotion()`
-  (follows the setting live), `useEntrance(ref, ready)` → `entering` for `data-entering` on a
-  list (true from the render in which the data first arrives until the animations under `ref`
-  finish, never again for that component: no entrance on a refetch or a filter),
+  (follows the setting live), `useEntrance(ref, ready, { once?, maxMs? })` → `entering` for
+  `data-entering` on a list (true from the render in which the data first arrives until the
+  animations under `ref` finish, never again for that component: no entrance on a refetch or a
+  filter; `once: 'session'` plays only in components that mount with the session's first view,
+  until the page is next idle, so later navigations show their lists at once, as in Finance),
   `viewTransition(update)` (same-document view transition with the update flushed synchronously;
   without the API, under `reduce` or on a hidden page it just runs the update; resolves when
   done), `useSlidingIndicator(containerRef, selector, key, axis?)` → `{ style, instant }` (measures
@@ -102,14 +113,23 @@ are a starting point, not a shared theme.
   `indicatorStyle`, `sameBox`. Never put `view-transition-name` on `.app-shell-main` or the page
   column: it becomes a stacking context while named, and fixed overlays inside land under the bars
   (Paper, Finance). Which way a page enters, FLIP lists and the keyframes stay app-owned.
+  Moving an existing app onto the policy is mostly mechanical: every `animation*` and
+  `transition*` declaration goes into one `@media (prefers-reduced-motion: no-preference)` block,
+  keeping its selector and at-rule ancestors; `@keyframes` and rules already under a
+  `prefers-reduced-motion` query stay. Paper did it with a one-off PostCSS script; the registry
+  ships none (it would add a Node dependency to a Go tool). Moving declarations to the end changes
+  their cascade order: diff the result and check that no later rule meant to override them.
 - `phone-audit` (`e2e/foundation/phone-audit.ts`, `e2e/foundation/phone-audit-tests.ts`) is the
   phone check from Paper's overflow and pan scripts and Workbench's mobile spec, for Playwright.
   It opens each route at 375x667 and 390x844 (touch, `isMobile`, `serviceWorkers: 'block'`,
   `de-CH`) and reports structured findings (`check`, `selector`, `detail`, `text`):
   `page-overflow`, `wide-element`, `sideways-pan` (real CDP touch swipes at three heights, both
   ways: scroll, visual viewport, scroller, zoom or a history swipe), `text-overflow` (text outside
-  its control; ellipsis and line clamp pass), `number-split`, `tap-target` (44px, counting an
-  invisible `::before`/`::after`, inline links in text exempt), `input-font` (16px), `small-text`
+  its control; ellipsis and line clamp pass; visually hidden text such as `.sr-only` and
+  absolutely positioned children and pseudo-elements, a `NavBadge` or the `::after` of
+  `.hit-target`, are not measured), `number-split`, `tap-target` (44px, counting an invisible
+  `::before`/`::after` against its containing block, so a stretched link's `::after` with
+  `inset: 0` counts as its card; inline links in text exempt), `input-font` (16px), `small-text`
   (14px), `autofocus`, `layout-shift` (Layout Instability API in a refetch window), `axe`
   (wcag2a/aa, 2.1 a/aa, 2.2 aa) and, in a pass with `reducedMotion: 'reduce'`,
   `running-animation`. `sideways-pan` and `layout-shift` need Chromium; elsewhere they report
@@ -158,7 +178,10 @@ are a starting point, not a shared theme.
   server (offline, or the fetch `TypeError` of Chromium, Firefox and Safari) and false for any
   `APIError`, which is an answer (also the 401 of an expired session). What the app shows offline,
   and whether its queries pause, stays app policy; there is no query-library coupling.
-- `profile` also installs `public/profile-theme.js`, for an app with a dark look
+- `profile`: the compact profile button (`ProfileMenu compact`, `ProfileCard compact`, top bar on
+  phones) is a 44px target, and its accessible name is "menu: name, initials" while the initials
+  are what it shows (`profileButtonLabel`); the full card is named by its visible text.
+  `profile` also installs `public/profile-theme.js`, for an app with a dark look
   (`ProfileProvider themes`). `index.html` loads it in `<head>` before any stylesheet, as a file
   because the CSP blocks inline scripts: `<script src="/profile-theme.js"></script>`. It sets
   `<html data-theme>` and `color-scheme` from the stored appearance (`profile.theme`; auto follows
@@ -198,18 +221,22 @@ are a starting point, not a shared theme.
   with `{endpoint}`); `state` is `unknown`, `unsupported`, `needs-install` (iOS in a browser tab),
   `denied`, `off` or `on`. Call `subscribe` from a tap. `setAppBadge(n)` sets or clears the icon
   count from the page. What is sent, counted and said stays in the app.
-- `palette` is a command palette's logic, no component: `rank(items, query)` orders
+- `palette` is a command palette's logic, no component: `rank(items, query, tieBreak?)` orders
   `{ label, detail?, aliases? }` by exact label, label prefix, word start, every word of a
   multi-word query starting a word, alias, substring, every word anywhere, detail and last a fuzzy
   subsequence ("crts" → Certificates); `normalize` ignores case and accents and folds ß to ss and
-  ae/oe/ue to a/o/u, so "uber", "ueber" and "Über" meet. `readRecents(key)` and
+  ae/oe/ue to a/o/u, so "uber", "ueber" and "Über" meet. Within a tier a shorter label wins, then
+  the given order; `tieBreak(a, b)` (a comparator) decides between equal matches before the label
+  length, e.g. active contracts first. `readRecents(key)` and
   `pushRecent(key, id)` keep the last picks (5) in localStorage under the app's key.
   `shortcuts.ts` has `isTypingTarget(el)` and `createShortcutHandler({ keys, go, primary })`: single
   keys by the typed character, `g` then a letter within 1.5 s, and `primary` combinations with ⌘
   (Apple) or Ctrl. It leaves alone keys in text fields (except `primary`), inside or behind an open
   modal dialog, during IME composition, and any key with Alt held, so AltGr (Ctrl+Alt on Windows;
-  AltGr+2 types @ on a Swiss keyboard) never fires a shortcut. The palette's look, commands and
-  shortcut list stay in the app.
+  AltGr+2 types @ on a Swiss keyboard) never fires a shortcut. `primaryInDialog: true` lets the
+  `primary` combinations through from inside a dialog, so ⌘K/Ctrl+K in the open palette closes it
+  (single keys and go sequences stay off there; an action that does not apply returns false). The
+  palette's look, commands and shortcut list stay in the app.
 - `scroll-edges`: `useScrollEdges(ref)` sets `data-more-start` / `data-more-end` on a sideways
   scroller while there is more that way (scroll, resize of the scroller or its items, items added),
   without re-rendering; `scroll-edges.css` adds `.edge-fade`, a mask only (lengths
@@ -266,11 +293,15 @@ useSheetDrag(ref, { onClose: () => setOpen(false), below: 700 });
 </dialog>
 ```
 
-- `useSheet(ref, open, onClose, { scroller?, backdropClose? })` / `showSheet(dialog, { onClose,
-  scroller, backdropClose }) → close`: `onClose` is the person's request (Escape, backdrop tap, a
-  form with `method=dialog`); the app sets its state, and the hook closes the dialog. Focus returns
-  to the opener. On a touch screen the dialog itself takes the focus unless an element inside has
-  `autofocus`: a focused field brings up the keyboard, and `pwa-shell` then hides the nav.
+- `useSheet(ref, open, onClose, { scroller?, backdropClose?, initialFocus? })` /
+  `showSheet(dialog, { onClose, scroller, backdropClose, initialFocus }) → close`: `onClose` is the
+  person's request (Escape, backdrop tap, a form with `method=dialog`); the app sets its state, and
+  the hook closes the dialog. Focus returns to the opener. On a touch screen the dialog itself
+  takes the focus unless an element inside has `autofocus`: a focused field brings up the
+  keyboard, and `pwa-shell` then hides the nav. On a fine pointer `initialFocus` (an element or a
+  selector inside the dialog) or else the first `[data-autofocus]` inside takes the focus. Use
+  `data-autofocus`, not React's `autoFocus`: React focuses when the element mounts, before the
+  dialog is shown, and that focus is lost.
 - `lockScroll(scroller?) → release`: ref-counted, on `.app-shell-main` (the document scroller
   without the shell). Never `body`: with `pwa-shell` the document does not scroll, so a lock on
   `body` leaves the page behind the sheet scrolling on iOS. `showSheet` takes it; use it directly
@@ -279,7 +310,9 @@ useSheetDrag(ref, { onClose: () => setOpen(false), below: 700 });
   element marked `data-sheet-handle` (grabber, header), touch and pen only, closes past `threshold`
   px or on a flick (over 0.5 px/ms in the last 100 ms); buttons, links and fields inside a handle
   stay pressable. The offset is `--sheet-drag`, applied as `translate`, so the app's own transforms
-  and keyframes are untouched; `data-dragging` is set during the drag.
+  and keyframes are untouched; `data-dragging` is set during the drag. Without a drag offset
+  `translate` is `none`: any other value makes the sheet the containing block of its
+  `position: fixed` children (a menu, a popover), which then scroll and clip with it.
 - `sheet.css` (`dialog[data-sheet]`, set by `showSheet`): at the bottom edge, full width, never
   under the status bar, scrolls itself with `overscroll-behavior: contain`, and an `::after` spacer
   of `env(safe-area-inset-bottom)` so the last content clears the home indicator with or without a
@@ -343,7 +376,8 @@ const { pull, ready, busy } = usePullToRefresh(main, () => queryClient.refetchQu
   from 72 px of indicator travel (144 px of finger), capped at 1.6× that; `busy` lasts until
   `refresh` settles (a rejection too) and at least `minSpin` (500 ms). All options:
   `{ trigger, max, slop, damping, minSpin, enabled }`.
-- Off while a modal dialog or `[aria-modal="true"]` is open, and for new pulls while busy.
+- Off while a modal dialog, `[aria-modal="true"]` or an open Radix dialog
+  (`[role=dialog][data-state=open]`, also `alertdialog`) is open, and for new pulls while busy.
 - Passive listeners: nothing is cancelled and the page itself never moves, so the scroller's own
   bounce stays as it is. The indicator, its position and its motion are the app's.
 - Apps without React: `attachPullToRefresh(scroller, refresh, onState, options) → detach`.
