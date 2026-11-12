@@ -122,6 +122,21 @@ func TestPhoneAudit(t *testing.T) {
 	}
 }
 
+// touch, sheet and pull-refresh in a real Chromium: the 44px floor and .hit-target, the sheet's
+// focus and its translate, a Radix dialog as a modal. Needs PHONE_AUDIT_PLAYWRIGHT like TestPhoneAudit.
+func TestModulesInBrowser(t *testing.T) {
+	playwright := os.Getenv("PHONE_AUDIT_PLAYWRIGHT")
+	if playwright == "" {
+		t.Skip("PHONE_AUDIT_PLAYWRIGHT not set (path to the playwright package)")
+	}
+	node := nodeTS(t)
+	command := exec.Command(node, filepath.Join("testdata", "modules_browser_test.mjs"), "sources")
+	command.Env = append(os.Environ(), "PHONE_AUDIT_PLAYWRIGHT="+playwright)
+	if out, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("modules in the browser: %v\n%s", err, out)
+	}
+}
+
 // The audit's page code runs in the browser and its module in Node: it may import Playwright only
 // as types, and axe only lazily (an app without axe sets axe: false).
 func TestPhoneAuditImports(t *testing.T) {
