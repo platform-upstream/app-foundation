@@ -77,6 +77,8 @@ func TestConfiguration(t *testing.T) {
 		{MaxTokens: 10},
 		{Messages: []llm.Message{{Role: "user", Content: "Hi"}}},
 		{Messages: []llm.Message{{Role: "user", Content: "Hi"}}, MaxTokens: 10, Effort: "minimal"},
+		{Messages: []llm.Message{{Role: "user", Content: "Hi"}}, MaxTokens: 10, ToolChoice: llm.ToolChoiceNone},
+		{Messages: []llm.Message{{Role: "user", Content: "Hi"}}, MaxTokens: 10, ToolChoice: "any", Tools: []llm.Tool{{Name: "t"}}},
 	} {
 		if _, err := c.Complete(context.Background(), req); err == nil {
 			t.Fatalf("invalid request accepted: %+v", req)
@@ -186,5 +188,29 @@ func TestCachedTokens(t *testing.T) {
 		if err != nil || resp.Usage.CachedTokens != 8 || resp.Usage.PromptTokens != 10 {
 			t.Fatalf("usage %s: %+v %v", usage, resp.Usage, err)
 		}
+	}
+}
+
+func TestToolChoice(t *testing.T) {
+	server := llmtest.NewServer(t, func(llmtest.Request) llmtest.Reply { return llmtest.Reply{Content: "Answer"} })
+	c := client(t, server)
+	tools := []llm.Tool{{Name: "lookup", Description: "Look up."}}
+	for _, choice := range []llm.ToolChoice{"", llm.ToolChoiceNone, llm.ToolChoiceRequired} {
+		if _, err := c.Complete(context.Background(), llm.Request{Messages: []llm.Message{{Role: "user", Content: "Hi"}},
+			MaxTokens: 10, Tools: tools, ToolChoice: choice}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := c.Complete(context.Background(), llm.Request{Messages: []llm.Message{{Role: "user", Content: "Hi"}}, MaxTokens: 10}); err != nil {
+		t.Fatal(err)
+	}
+	requests := server.Requests()
+	for i, want := range []string{"auto", "none", "required"} {
+		if requests[i].Body["tool_choice"] != want || requests[i].Body["tools"] == nil {
+			t.Fatalf("request %d: %s", i, requests[i].Raw)
+		}
+	}
+	if _, ok := requests[3].Body["tool_choice"]; ok {
+		t.Fatalf("tool_choice without tools: %s", requests[3].Raw)
 	}
 }

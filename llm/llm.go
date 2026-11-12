@@ -122,6 +122,15 @@ func (e Effort) wire() (string, error) {
 	return "", fmt.Errorf("llm: unknown effort %q", string(e))
 }
 
+// ToolChoice tells the model whether it may, must or must not call a tool.
+type ToolChoice string
+
+const (
+	ToolChoiceAuto     ToolChoice = "auto"
+	ToolChoiceNone     ToolChoice = "none"
+	ToolChoiceRequired ToolChoice = "required"
+)
+
 // Request is one completion.
 type Request struct {
 	Messages []Message
@@ -131,8 +140,11 @@ type Request struct {
 	// Temperature is a best-effort hint: the local runtime honours it, Claude drops it. A prompt
 	// must work without it.
 	Temperature *float64
-	// Tools are offered with tool_choice "auto".
+	// Tools are offered with ToolChoice, "auto" when empty.
 	Tools []Tool
+	// ToolChoice is "auto" (the model decides), "none" (answer in text; the tools stay declared,
+	// so earlier tool calls in the messages remain valid) or "required" (call a tool).
+	ToolChoice ToolChoice
 
 	format any
 }
@@ -226,6 +238,17 @@ func (c *Client) body(req Request, stream bool) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	choice := req.ToolChoice
+	switch choice {
+	case "":
+		choice = ToolChoiceAuto
+	case ToolChoiceAuto, ToolChoiceNone, ToolChoiceRequired:
+		if len(req.Tools) == 0 {
+			return nil, errors.New("llm: a tool choice needs tools")
+		}
+	default:
+		return nil, fmt.Errorf("llm: unknown tool choice %q", string(choice))
+	}
 	body := map[string]any{
 		"model":            c.cfg.Model,
 		"messages":         req.Messages,
@@ -240,7 +263,7 @@ func (c *Client) body(req Request, stream bool) ([]byte, error) {
 	}
 	if len(req.Tools) > 0 {
 		body["tools"] = req.Tools
-		body["tool_choice"] = "auto"
+		body["tool_choice"] = string(choice)
 	}
 	if stream {
 		body["stream"] = true
