@@ -22,6 +22,9 @@
     },
     "motion": {
       "description": "Reduced-motion policy (no tokens) plus prefersReducedMotion, useReducedMotion, useEntrance (first insert only), viewTransition with fallback, useSlidingIndicator."
+    },
+    "phone-audit": {
+      "description": "Playwright phone audit at 375x667 and 390x844 (touch): sideways pan, text and number overflow, 44px targets, 16px fields, 14px text, axe, autofocus, refetch layout shift, reduced motion, platform rules."
     }
   },
   "files": [
@@ -45,6 +48,8 @@
     { "module": "template", "source": "sources/template/app.css", "target": "src/app.css" },
     { "module": "touch", "source": "sources/touch/touch.css", "target": "src/foundation/touch.css" },
     { "module": "motion", "source": "sources/motion/motion.css", "target": "src/foundation/motion.css" },
-    { "module": "motion", "source": "sources/motion/motion.ts", "target": "src/foundation/motion.ts" }
+    { "module": "motion", "source": "sources/motion/motion.ts", "target": "src/foundation/motion.ts" },
+    { "module": "phone-audit", "source": "sources/phone-audit/phone-audit.ts", "target": "e2e/foundation/phone-audit.ts" },
+    { "module": "phone-audit", "source": "sources/phone-audit/phone-audit-tests.ts", "target": "e2e/foundation/phone-audit-tests.ts" }
   ]
 }

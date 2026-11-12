@@ -1,6 +1,7 @@
 package frontendregistry
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -97,6 +98,40 @@ func TestMotionPolicyCSS(t *testing.T) {
 	ts := readSource(t, "sources/motion/motion.ts")
 	if regexp.MustCompile(`(?m)^[^*/]*\.animate\(`).MatchString(ts) {
 		t.Fatal("motion.ts must not animate by itself: keyframes are the application's look")
+	}
+}
+
+// The phone audit against fixture pages in a real Chromium: clean.html passes, defects.html trips
+// every check. Needs PHONE_AUDIT_PLAYWRIGHT (path to the `playwright` package; CHROME optional).
+func TestPhoneAudit(t *testing.T) {
+	playwright := os.Getenv("PHONE_AUDIT_PLAYWRIGHT")
+	if playwright == "" {
+		t.Skip("PHONE_AUDIT_PLAYWRIGHT not set (path to the playwright package)")
+	}
+	node := nodeTS(t)
+	command := exec.Command(node, filepath.Join("testdata", "phone_audit_test.mjs"), filepath.Join("sources", "phone-audit", "phone-audit.ts"))
+	command.Env = append(os.Environ(), "PHONE_AUDIT_PLAYWRIGHT="+playwright)
+	if out, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("phone-audit: %v\n%s", err, out)
+	}
+}
+
+// The audit's page code runs in the browser and its module in Node: it may import Playwright only
+// as types, and axe only lazily (an app without axe sets axe: false).
+func TestPhoneAuditImports(t *testing.T) {
+	ts := readSource(t, "sources/phone-audit/phone-audit.ts")
+	for _, line := range regexp.MustCompile(`(?m)^import .*$`).FindAllString(ts, -1) {
+		if !strings.HasPrefix(line, "import type ") {
+			t.Fatalf("phone-audit.ts may only import types at the top: %s", line)
+		}
+	}
+	if !strings.Contains(ts, "await import('@axe-core/playwright')") {
+		t.Fatal("axe must be imported lazily")
+	}
+	for _, want := range []string{"width: 375, height: 667", "width: 390, height: 844", "serviceWorkers: 'block'", "hasTouch: true", "'wcag22aa'"} {
+		if !strings.Contains(ts, want) {
+			t.Fatalf("phone-audit.ts lost %q", want)
+		}
 	}
 }
 
