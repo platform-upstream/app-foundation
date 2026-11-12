@@ -2,7 +2,7 @@
   "version": 1,
   "modules": {
     "api": {
-      "description": "Same-origin JSON client with the standard error envelope and an injected auth-expiry hook."
+      "description": "Same-origin JSON client with the standard error envelope and an injected auth-expiry hook; useOnline and isOfflineError."
     },
     "pwa": {
       "description": "Service-worker registration and update lifecycle (onUpdate); the service worker itself is installed by template (copy it on upgrade; app code goes in sw-app.js)."
@@ -29,6 +29,7 @@
   },
   "files": [
     { "module": "api", "source": "sources/api/api.ts", "target": "src/foundation/api.ts" },
+    { "module": "api", "source": "sources/api/online.ts", "target": "src/foundation/online.ts" },
     { "module": "pwa", "source": "sources/pwa/register-service-worker.ts", "target": "src/foundation/register-service-worker.ts" },
     { "module": "pwa-shell", "source": "sources/pwa-shell/shell.css", "target": "src/foundation/shell.css" },
     { "module": "pwa-shell", "source": "sources/pwa-shell/viewport.ts", "target": "src/foundation/viewport.ts" },
