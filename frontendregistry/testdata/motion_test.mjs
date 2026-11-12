@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 const flushed = [];
 const stubs = {
-  react: 'export const useEffect = () => {}; export const useLayoutEffect = () => {}; export const useState = (v) => [v, () => {}]; export const useSyncExternalStore = (s, get) => get();',
+  react: 'export const useEffect = () => {}; export const useLayoutEffect = () => {}; export const useState = (v) => [typeof v === \'function\' ? v() : v, () => {}]; export const useSyncExternalStore = (s, get) => get();',
   'react-dom': 'export const flushSync = (fn) => { globalThis.__flushed.push(true); return fn(); };',
 };
 globalThis.__flushed = flushed;
@@ -98,5 +98,45 @@ const start = Date.now();
 await motion.animationsSettled({ getAnimations: () => [animation(1, new Promise(() => {}))] }, 30);
 assert.ok(Date.now() - start < 1000, 'maxMs caps the wait');
 await motion.animationsSettled({}); // no getAnimations: at once
+
+// once: 'session': the first call opens a window for everything mounting with the first view;
+// once the page is idle, later calls say no.
+{
+  const idle = [];
+  globalThis.requestIdleCallback = (fn, options) => { assert.equal(options.timeout, 1500); idle.push(fn); };
+  motion.resetSessionEntrance();
+  assert.equal(motion.sessionEntranceOpen(), true, 'the first view plays');
+  assert.equal(motion.sessionEntranceOpen(), true, 'its siblings in the same task play too');
+  assert.equal(idle.length, 1, 'one window');
+  idle.shift()();
+  assert.equal(motion.sessionEntranceOpen(), false, 'a later view does not');
+  assert.equal(idle.length, 0);
+  motion.resetSessionEntrance();
+  delete globalThis.requestIdleCallback;
+  assert.equal(motion.sessionEntranceOpen(), true);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(motion.sessionEntranceOpen(), false, 'without requestIdleCallback the window closes after the task');
+}
+
+// useEntrance (React stubbed: useState runs its initializer, effects never run): with once 'session'
+// a component mounting after the first view starts out done; the default and a number still enter.
+{
+  const ref = { current: null };
+  motion.resetSessionEntrance();
+  globalThis.requestIdleCallback = () => {};
+  assert.equal(motion.useEntrance(ref, true, { once: 'session' }), true, 'first view enters');
+  globalThis.requestIdleCallback = (fn) => fn();
+  motion.resetSessionEntrance();
+  motion.sessionEntranceOpen();
+  assert.equal(motion.useEntrance(ref, true, { once: 'session' }), false, 'later view does not');
+  assert.equal(motion.useEntrance(ref, true), true, 'default: once per mount');
+  assert.equal(motion.useEntrance(ref, true, 800), true, 'maxMs as a number still works');
+  assert.equal(motion.useEntrance(ref, false, { once: 'session' }), false, 'nothing before ready');
+  reduce = true;
+  motion.resetSessionEntrance();
+  assert.equal(motion.useEntrance(ref, true, { once: 'session' }), false, 'reduced motion never enters');
+  reduce = false;
+  delete globalThis.requestIdleCallback;
+}
 
 console.log('motion ok');

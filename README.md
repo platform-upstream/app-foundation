@@ -158,6 +158,11 @@ go env -w GOPRIVATE=github.com/platform-upstream/*
 go get github.com/platform-upstream/app-foundation@v1.2.0
 ```
 
+Any machine that bumps the pin needs a git credential helper for github.com (for example
+`gh auth git-credential`). An environment that sets `GONOPROXY` or `GONOSUMDB` itself loses
+GOPRIVATE's checksum-database exemption; add `GONOSUMDB=github.com/platform-upstream/*` then, or a
+fresh tag fails with `verifying module: … not found`.
+
 Consumers should pin an exact release. For container builds, resolve the module outside the image
 build, then commit the resulting `vendor/` tree and build with `go build -mod=vendor`. This keeps
 GitHub credentials out of build arguments and image layers. `go mod vendor` records the source;

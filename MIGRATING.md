@@ -1,3 +1,36 @@
+# Migrating to v1.15.0
+
+Compatible for the code. Registry files changed in `phone-audit`, `touch`, `palette`, `sheet`,
+`pull-refresh`, `motion` and `profile`: after the pin bump `check` fails for each of these an app
+installed until `go tool frontend-registry sync -target web -modules <yours>` is run and its diff
+reviewed. No new files. Bumping the pin: `GOPRIVATE=github.com/platform-upstream/*` and a git
+credential helper on the machine (`docs/frontend-registry.md`, Workflow); where `GONOPROXY` or
+`GONOSUMDB` is set explicitly, add `GONOSUMDB=github.com/platform-upstream/*`.
+
+- `phone-audit`: fewer false positives. Visually hidden text (`.sr-only`) is not judged;
+  `text-overflow` no longer counts absolutely positioned children and pseudo-elements (`NavBadge`,
+  `.hit-target`'s `::after`); `tap-target` measures a stretched link's `::after` (`inset: 0`)
+  against its positioned card. Drop `ignore` entries and `skip`s added for these.
+- `touch`: a `.hit-target` button, select or field no longer gets the 44px `min-height` on touch
+  screens; an app that worked around it (`min-height: 0` on its chips) can drop that.
+- `palette`: `createShortcutHandler({ …, primaryInDialog: true })` lets ⌘K/Ctrl+K through inside a
+  dialog, so the open palette closes with the key that opened it (an app's own handler for that
+  can go). `rank(items, query, tieBreak)` takes a comparator for equal matches (before the
+  shorter-label rule).
+- `sheet`: on a desktop the first `[data-autofocus]` in the sheet (or `initialFocus`, an element or
+  selector, in `useSheet`/`showSheet` options) takes the focus; replace `autoFocus` and any
+  focus-after-open effect with `data-autofocus`. `sheet.css` sets `translate` only while a drag
+  offset is set, so `position: fixed` children of a sheet (menus, popovers) are placed against the
+  viewport again; an app that compensated for the sheet as containing block drops that.
+- `pull-refresh`: an open Radix dialog (`[role=dialog][data-state=open]`) stops the pull like a
+  modal `<dialog>`.
+- `motion`: `useEntrance(ref, ready, { once: 'session' })` plays only with the session's first
+  view; an app with its own once-per-session gate (Finance's `lib/entrance.ts`) can switch.
+  `useEntrance(ref, ready, maxMs)` still works.
+- `profile`: the compact profile button is 44px (6px padding around the 32px photo, was 4px) and
+  its accessible name contains the initials it shows; the full card is named by its text. An app
+  that styled `.pf-compact` padding itself keeps its own.
+
 # Migrating to v1.14.0
 
 Compatible for the code. New apps from `app-scaffold` start phone-ready (`docs/app-scaffold.md`).

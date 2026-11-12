@@ -81,6 +81,21 @@ const labels = (query, items = pages) => rank(items, query).map((p) => p.label);
   assert.deepEqual(labels('job', [{ label: 'Jobs running now' }, { label: 'Jobs' }]), ['Jobs', 'Jobs running now']);
 }
 
+// A tie-break orders equal matches (same tier) before the shorter label; other tiers stay apart.
+{
+  const contracts = [
+    { label: 'Swisscom Mobile', active: false },
+    { label: 'Swisscom', active: false },
+    { label: 'Swisscom Internet', active: true },
+    { label: 'Mobile Swisscom', active: true },
+  ];
+  const activeFirst = (a, b) => Number(b.active) - Number(a.active);
+  assert.deepEqual(rank(contracts, 'swiss').map((c) => c.label), ['Swisscom', 'Swisscom Mobile', 'Swisscom Internet', 'Mobile Swisscom']);
+  assert.deepEqual(rank(contracts, 'swiss', activeFirst).map((c) => c.label), ['Swisscom Internet', 'Swisscom', 'Swisscom Mobile', 'Mobile Swisscom'],
+    'active first among prefix matches; the word-start match stays below');
+  assert.deepEqual(rank(contracts, '', activeFirst).map((c) => c.label), ['Swisscom Internet', 'Mobile Swisscom', 'Swisscom Mobile', 'Swisscom'], 'empty query: tie-break, then given order');
+}
+
 // Recents: newest first, no duplicates, bounded, per key, broken storage is no error.
 {
   const memory = (initial = {}) => {
@@ -121,6 +136,7 @@ const labels = (query, items = pages) => rank(items, query).map((p) => p.label);
 }
 
 // Shortcuts: go sequences, single keys, guards.
+const body = () => ({ tagName: 'BODY', closest: () => null });
 {
   const setup = ({ dialogOpen = () => false, apple = false, available = () => true } = {}) => {
     let clock = 1_000;
@@ -206,6 +222,17 @@ const labels = (query, items = pages) => rank(items, query).map((p) => p.label);
   assert.equal(t.press('k', { ctrlKey: true, target: inDialog }), false);
   assert.equal(t.press('j', { ctrlKey: true }), false);
   assert.deepEqual(t.calls, ['palette', 'palette', 'palette']);
+  // primaryInDialog: ⌘K/Ctrl+K reaches the palette from inside it (to close it); other keys do not.
+  {
+    const calls = [];
+    const handle = createShortcutHandler({ keys: { r: () => { calls.push('r'); } }, primary: { k: () => { calls.push('toggle'); } }, primaryInDialog: true, apple: false, dialogOpen: () => true });
+    assert.equal(handle({ key: 'k', ctrlKey: true, target: inDialog }), true);
+    assert.equal(handle({ key: 'k', ctrlKey: true, target: { ...input, closest: inDialog.closest } }), true, 'from the palette input');
+    assert.equal(handle({ key: 'k', ctrlKey: true, altKey: true, target: inDialog }), false, 'still never with AltGr');
+    assert.equal(handle({ key: 'r', target: inDialog }), false, 'single keys stay off in a dialog');
+    assert.equal(handle({ key: 'r', target: body() }), false, 'and behind an open dialog');
+    assert.deepEqual(calls, ['toggle', 'toggle']);
+  }
   t = setup({ apple: true });
   assert.equal(t.press('k', { metaKey: true }), true);
   assert.equal(t.press('k', { ctrlKey: true }), false);

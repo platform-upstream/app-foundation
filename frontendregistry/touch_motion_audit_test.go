@@ -50,6 +50,12 @@ func TestTouchIsLookNeutralAndLayered(t *testing.T) {
 	if !strings.Contains(coarse[1], "input:not([type='checkbox'], [type='radio']") {
 		t.Fatal("44px floor must exclude checkboxes and radios")
 	}
+	// A .hit-target keeps its small look: the ::after takes the finger, not a min-height.
+	for _, want := range []string{"button:not(.hit-target)", "select:not(.hit-target)", ", .hit-target))"} {
+		if !strings.Contains(coarse[1], want) {
+			t.Fatalf("44px floor must exclude .hit-target (%q)", want)
+		}
+	}
 	for _, want := range []string{"touch-action: manipulation", "-webkit-tap-highlight-color: transparent", "text-size-adjust: 100%",
 		"inset: min(0px, calc((100% - 44px) / 2))", "overflow-x: clip", "overscroll-behavior-x: none"} {
 		if !strings.Contains(css, want) {
@@ -113,6 +119,21 @@ func TestPhoneAudit(t *testing.T) {
 	command.Env = append(os.Environ(), "PHONE_AUDIT_PLAYWRIGHT="+playwright)
 	if out, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("phone-audit: %v\n%s", err, out)
+	}
+}
+
+// touch, sheet and pull-refresh in a real Chromium: the 44px floor and .hit-target, the sheet's
+// focus and its translate, a Radix dialog as a modal. Needs PHONE_AUDIT_PLAYWRIGHT like TestPhoneAudit.
+func TestModulesInBrowser(t *testing.T) {
+	playwright := os.Getenv("PHONE_AUDIT_PLAYWRIGHT")
+	if playwright == "" {
+		t.Skip("PHONE_AUDIT_PLAYWRIGHT not set (path to the playwright package)")
+	}
+	node := nodeTS(t)
+	command := exec.Command(node, filepath.Join("testdata", "modules_browser_test.mjs"), "sources")
+	command.Env = append(os.Environ(), "PHONE_AUDIT_PLAYWRIGHT="+playwright)
+	if out, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("modules in the browser: %v\n%s", err, out)
 	}
 }
 

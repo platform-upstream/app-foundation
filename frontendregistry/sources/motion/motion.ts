@@ -47,21 +47,56 @@ export function animationsSettled(element: Element, maxMs = 1500): Promise<void>
   });
 }
 
+let sessionWindow: 'open' | 'closing' | 'closed' = 'open';
+
+/**
+ * Whether an entrance with `once: 'session'` that mounts now may play. The first call opens a
+ * window that closes when the page is next idle (at most 1.5s later): everything that mounts with
+ * the session's first view plays, every later view appears without its entrance.
+ */
+export function sessionEntranceOpen(): boolean {
+  if (sessionWindow === 'closed') return false;
+  if (sessionWindow === 'open') {
+    sessionWindow = 'closing';
+    const close = () => { sessionWindow = 'closed'; };
+    if (typeof globalThis.requestIdleCallback === 'function') globalThis.requestIdleCallback(close, { timeout: 1500 });
+    else setTimeout(close, 0);
+  }
+  return true;
+}
+
+/** Opens the session window again (tests). */
+export function resetSessionEntrance(): void {
+  sessionWindow = 'open';
+}
+
+export interface EntranceOptions {
+  /** How long to wait for the animations at most, in ms (default 1500). */
+  maxMs?: number;
+  /** 'mount' (default): once per component. 'session': only with the first view of the page
+   *  session (see sessionEntranceOpen); later views and navigations show their lists at once. */
+  once?: 'mount' | 'session';
+}
+
 /**
  * True while a list's entrance should play: from the render in which `ready` (the data is there)
  * first becomes true until the animations under `ref` have finished. Never again for the life of
  * the component: a refetch, a filter that empties and refills the list, or a new item mounts
- * without it. Under "reduce motion" it turns false at once.
+ * without it. Under "reduce motion" it turns false at once. With `{ once: 'session' }` it plays
+ * only in the components that mount with the session's first view.
  *
  *   const entering = useEntrance(listRef, items.length > 0);
+ *   const entering = useEntrance(cardsRef, ready, { once: 'session' });
  *   <ul ref={listRef} data-entering={entering || undefined}>
  *
  * The application's CSS animates `[data-entering] > li` under `no-preference`, with fill-mode
  * `backwards` (never `both`: a filled animation keeps each row a stacking context, and a row's menu
  * would open under the next row). Removing the attribute after the end changes nothing visible.
  */
-export function useEntrance(ref: RefObject<Element | null>, ready: boolean, maxMs = 1500): boolean {
-  const [done, setDone] = useState(false);
+export function useEntrance(ref: RefObject<Element | null>, ready: boolean, options: number | EntranceOptions = {}): boolean {
+  const { maxMs = 1500, once = 'mount' } = typeof options === 'number' ? { maxMs: options } : options;
+  // Decided once, when the component mounts: a session entrance outside the first view never plays.
+  const [done, setDone] = useState(() => once === 'session' && (prefersReducedMotion() || !sessionEntranceOpen()));
   const entering = ready && !done;
   useEffect(() => {
     if (!entering) return;

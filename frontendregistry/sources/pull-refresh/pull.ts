@@ -77,7 +77,11 @@ export function pullEnabled(win: Pick<Window, 'matchMedia' | 'navigator'>): bool
   return standalone && mq('(pointer: coarse)');
 }
 
-/** A modal dialog or sheet is open: the pull belongs to the page, which is behind it. */
+/**
+ * A modal dialog or sheet is open: the pull belongs to the page, which is behind it. Counts a
+ * native modal `<dialog>`, anything with `aria-modal="true"`, and an open Radix dialog
+ * (`[role=dialog][data-state=open]`, also when its content carries no aria-modal).
+ */
 export function dialogOpen(doc: Pick<Document, 'querySelector'>): boolean {
   let modal: Element | null = null;
   try {
@@ -85,7 +89,7 @@ export function dialogOpen(doc: Pick<Document, 'querySelector'>): boolean {
   } catch {
     modal = doc.querySelector('dialog[open]');
   }
-  return !!modal || !!doc.querySelector('[aria-modal="true"]');
+  return !!modal || !!doc.querySelector('[aria-modal="true"], [role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]');
 }
 
 /**

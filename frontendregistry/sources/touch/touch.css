@@ -33,8 +33,9 @@
     }
 
     /* 44px is the smallest target a finger hits reliably (Apple HIG, WCAG 2.5.5). Checkboxes and
-       radios take the finger through their label; a chip that must look smaller uses .hit-target. */
-    :where(button, select, input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='hidden'])) {
+       radios take the finger through their label; a chip that must look smaller uses .hit-target,
+       which has no floor (its ::after takes the finger). */
+    :where(button:not(.hit-target), select:not(.hit-target), input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='hidden'], .hit-target)) {
       min-height: 44px;
     }
   }

@@ -58,6 +58,11 @@ export interface SheetOptions {
   scroller?: HTMLElement | null;
   /** Close on a tap on the backdrop (default true). */
   backdropClose?: boolean;
+  /** What takes the focus on a fine pointer (desktop): an element, or a selector inside the
+   *  dialog. Default: the first element inside with `data-autofocus` (React's `autoFocus` never
+   *  reaches a dialog opened later), else the browser's choice. On a touch screen the dialog
+   *  itself takes the focus unless an element has `autofocus`. */
+  initialFocus?: HTMLElement | string | null;
 }
 
 const stack: HTMLDialogElement[] = [];
@@ -72,7 +77,8 @@ export function openSheets(): readonly HTMLDialogElement[] {
  * Opens `dialog` as a modal sheet and returns the function that closes it. While open: the
  * scroller is locked, Escape and a backdrop tap call `onClose` (only for the topmost sheet), and
  * on a touch screen the dialog itself takes the focus unless an element inside has `autofocus`
- * (a focused field would bring up the keyboard and hide the nav). On close the focus returns to
+ * (a focused field would bring up the keyboard and hide the nav); on a fine pointer
+ * `initialFocus` or the first `[data-autofocus]` inside takes it. On close the focus returns to
  * the element that had it before, if it is still in the page.
  */
 export function showSheet(dialog: HTMLDialogElement, options: SheetOptions = {}): () => void {
@@ -118,6 +124,11 @@ export function showSheet(dialog: HTMLDialogElement, options: SheetOptions = {})
   if (ownFocus && !hadTabIndex) dialog.tabIndex = -1;
   if (!dialog.open) dialog.showModal();
   if (ownFocus) dialog.focus({ preventScroll: true });
+  if (!touch) {
+    const wanted = options.initialFocus;
+    const target = wanted instanceof HTMLElement ? wanted : dialog.querySelector<HTMLElement>(typeof wanted === 'string' ? wanted : '[data-autofocus]');
+    if (target && dialog.contains(target)) target.focus();
+  }
 
   let done = false;
   function cleanup() {

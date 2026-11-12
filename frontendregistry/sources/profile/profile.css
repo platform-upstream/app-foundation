@@ -9,7 +9,10 @@
   }
   .pf-card:hover { background: color-mix(in srgb, currentColor 7%, transparent); }
   .pf-card:focus-visible { outline: 3px solid color-mix(in srgb, var(--pf-accent, #1d1b19) 50%, transparent); outline-offset: 2px; }
-  .pf-card.pf-compact { width: auto; padding: 4px; border-radius: 50%; }
+  /* 32px photo + 2 x 6px: a 44px target. */
+  .pf-card.pf-compact { width: auto; padding: 6px; border-radius: 50%; justify-content: center; }
+  /* Read out, not shown: what the card button does, before the name. */
+  .pf-text .pf-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
   .pf-card.pf-loading { height: 56px; }
   .pf-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
   .pf-text b { font-size: 15px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

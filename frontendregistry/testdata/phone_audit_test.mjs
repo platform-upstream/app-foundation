@@ -57,6 +57,7 @@ for (const [check, selector] of [
   ['page-overflow'],
   ['wide-element', '#wide'],
   ['text-overflow', '#cramped'],
+  ['text-overflow', '#stuffed'],
   ['number-split', '#split'],
   ['tap-target', '#tiny'],
   ['input-font', '#small-input'],
@@ -67,6 +68,9 @@ for (const [check, selector] of [
 ]) assert.ok(has(check, selector), `defects.html: expected ${check} ${selector ?? ''}\n${report}`);
 // The reported tap target names its size.
 assert.match(found.find((f) => f.check === 'tap-target' && f.selector.includes('#tiny')).detail, /^24 x 24 under 44 x 44$/);
+
+// In-flow content wider than its control still counts after leaving out positioned children.
+assert.match(found.find((f) => f.check === 'text-overflow' && f.selector.includes('#stuffed')).detail, /^content 100px wide in 50px$/);
 
 // skip leaves a check out.
 const skipped = await run('defects.html', phone, {}, { skip: ['small-text', 'layout-shift', 'sideways-pan'] });

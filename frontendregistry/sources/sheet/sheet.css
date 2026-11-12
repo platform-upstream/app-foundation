@@ -18,8 +18,11 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     /* The drag offset uses `translate`, not `transform`, so the app's own transforms and keyframes
-       keep working. */
-    translate: 0 var(--sheet-drag, 0px);
+       keep working. No fallback on purpose: while attachSheetDrag has not set --sheet-drag (not
+       dragging, settling or sliding out) the declaration is invalid and `translate` is `none`. Any
+       other value would make the sheet the containing block of its position: fixed children
+       (a menu, a popover, a toast) and clip them to the sheet. */
+    translate: 0 var(--sheet-drag);
   }
 
   /* The home indicator always gets its room, with or without a footer and whatever padding the
