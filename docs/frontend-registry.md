@@ -73,6 +73,68 @@ are a starting point, not a shared theme.
 - `template` supplies only a clean React/Vite entry point, visible application-owned QueryClient
   policy, accessible document defaults, root-origin build configuration, PWA registration, and a
   minimal `AppShell` with a top bar and nav that tells adopters to create an application identity.
+- `api` also installs `online.ts`: `useOnline()` (`navigator.onLine` and its events through
+  `useSyncExternalStore`) and `isOfflineError(err)`, true for a request that never reached a
+  server (offline, or the fetch `TypeError` of Chromium, Firefox and Safari) and false for any
+  `APIError`, which is an answer (also the 401 of an expired session). What the app shows offline,
+  and whether its queries pause, stays app policy; there is no query-library coupling.
+- `profile` also installs `public/profile-theme.js`, for an app with a dark look
+  (`ProfileProvider themes`). `index.html` loads it in `<head>` before any stylesheet, as a file
+  because the CSP blocks inline scripts: `<script src="/profile-theme.js"></script>`. It sets
+  `<html data-theme>` and `color-scheme` from the stored appearance (`profile.theme`; auto follows
+  the system) before the first paint, so a dark app never flashes light; `data-legacy-key` on the
+  script tag names an app's older key, read while `profile.theme` is unset. Each
+  `<meta name="theme-color">` placed before the script with `data-light` and `data-dark` (the app's
+  colours) follows `data-theme` from then on; its `media` attribute is dropped. The template
+  worker does not cache the file: an offline launch paints with the CSS default until the profile
+  module runs.
+- `pwa-shell` also has a nav badge: `NavBadge({ count, label, dot?, tone? })` inside an element
+  with class `nav-badge-anchor` around the icon. Nothing at 0, `99+` above 99, `dot` for a dot
+  without the number; `label` is the accessible text in the app's words. `shell.css` places it
+  out of flow over the icon's top end corner at a fixed height, so it never moves the icon or the
+  label; size and position via `--nav-badge-size`, `--nav-badge-top`, `--nav-badge-overlap`,
+  `--nav-badge-font-size`, `--nav-badge-dot`. Background, colour, radius, ring and tones
+  (`[data-tone]`) are the app's, as are nav height and the active item.
+- `push` is Web Push without the app's words. `public/sw-push.js` is loaded by the app's
+  `public/sw-app.js` and wired there:
+
+  ```js
+  importScripts('sw-push.js');
+  self.addEventListener('push', (event) => FoundationPush.handlePush(event, { fallbackTitle: 'Acme', icon: '/pwa/icon-192.png' }));
+  self.addEventListener('notificationclick', (event) => FoundationPush.handleClick(event));
+  ```
+
+  `handlePush` always shows a notification (iOS ends the subscription of a worker that stays
+  silent): the payload's `title` (at most 120 characters, else `fallbackTitle`), `body` (500),
+  `url`, `tag` (or `id`, 120; a push with the same tag replaces the earlier one, so send one tag
+  per subject) and `badge` (the app icon's count, 0 clears it; feature-detected, a refusal is no
+  error). A Declarative Web Push message (`{"web_push": 8030, "notification": {title, body,
+  navigate, tag, app_badge}}`) is read the same way. Only a URL of the app's own scope is kept;
+  anything else opens the start page. `handleClick` focuses an open window of the app first (while
+  the click still counts as a gesture) and then navigates it, or opens a new one. On the page,
+  `usePush({ endpoint = '/api/push', vapidKey? })` returns `{ state, busy, error, subscribe,
+  unsubscribe }` over the routes Console, Paper and Finance share (`GET key` → `{publicKey}`,
+  `POST subscribe` with the subscription JSON that Go `push.Subscription` reads, `POST unsubscribe`
+  with `{endpoint}`); `state` is `unknown`, `unsupported`, `needs-install` (iOS in a browser tab),
+  `denied`, `off` or `on`. Call `subscribe` from a tap. `setAppBadge(n)` sets or clears the icon
+  count from the page. What is sent, counted and said stays in the app.
+- `palette` is a command palette's logic, no component: `rank(items, query)` orders
+  `{ label, detail?, aliases? }` by exact label, label prefix, word start, every word of a
+  multi-word query starting a word, alias, substring, every word anywhere, detail and last a fuzzy
+  subsequence ("crts" → Certificates); `normalize` ignores case and accents and folds ß to ss and
+  ae/oe/ue to a/o/u, so "uber", "ueber" and "Über" meet. `readRecents(key)` and
+  `pushRecent(key, id)` keep the last picks (5) in localStorage under the app's key.
+  `shortcuts.ts` has `isTypingTarget(el)` and `createShortcutHandler({ keys, go, primary })`: single
+  keys by the typed character, `g` then a letter within 1.5 s, and `primary` combinations with ⌘
+  (Apple) or Ctrl. It leaves alone keys in text fields (except `primary`), inside or behind an open
+  modal dialog, during IME composition, and any key with Alt held, so AltGr (Ctrl+Alt on Windows;
+  AltGr+2 types @ on a Swiss keyboard) never fires a shortcut. The palette's look, commands and
+  shortcut list stay in the app.
+- `scroll-edges`: `useScrollEdges(ref)` sets `data-more-start` / `data-more-end` on a sideways
+  scroller while there is more that way (scroll, resize of the scroller or its items, items added),
+  without re-rendering; `scroll-edges.css` adds `.edge-fade`, a mask only (lengths
+  `--edge-fade-start`, `--edge-fade-end`), so it fades over any background. Snapping, arrows and
+  the strip's look stay in the app.
 
 ## Deliberate non-abstractions
 

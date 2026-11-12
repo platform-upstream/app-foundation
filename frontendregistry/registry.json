@@ -2,30 +2,42 @@
   "version": 1,
   "modules": {
     "api": {
-      "description": "Same-origin JSON client with the standard error envelope and an injected auth-expiry hook."
+      "description": "Same-origin JSON client with the standard error envelope and an injected auth-expiry hook; useOnline and isOfflineError."
     },
     "pwa": {
       "description": "Service-worker registration and update lifecycle (onUpdate); the service worker itself is installed by template (copy it on upgrade; app code goes in sw-app.js)."
     },
     "pwa-shell": {
-      "description": "iOS-standalone-safe mobile shell: large-viewport height, keyboard handling, nav as the last flex child, published nav height."
+      "description": "iOS-standalone-safe mobile shell: large-viewport height, keyboard handling, nav as the last flex child, published nav height, a nav badge slot (count or dot at the icon, 99+, no layout shift)."
     },
     "profile": {
-      "description": "The signed-in person bottom left (photo from directory) opening a menu: de/en, light/dark, the app's own settings and the person's other apps; backend: Go package profile at /api/me."
+      "description": "The signed-in person bottom left (photo from directory) opening a menu: de/en, light/dark, the app's own settings and the person's other apps; backend: Go package profile at /api/me; public/profile-theme.js sets the stored theme before the first paint and keeps the theme-color meta in step."
     },
     "template": {
       "description": "Minimal React/Vite application with app-owned content, theme, query policy, top bar and nav on the shared shell.",
       "requires": ["pwa", "pwa-shell"]
+    },
+    "push": {
+      "description": "Web Push: sw-push.js for the app's sw-app.js (checked payload, tag per subject, app badge, same-origin click that focuses before it navigates) and usePush/setAppBadge on the page."
+    },
+    "palette": {
+      "description": "Command palette logic without a look: rank (umlaut and accent folding, aliases, fuzzy), recent picks, isTypingTarget and a keyboard shortcut handler with typing, dialog, AltGr and IME guards."
+    },
+    "scroll-edges": {
+      "description": "useScrollEdges marks a sideways scroller with data-more-start/end; .edge-fade fades those edges with a mask only (no colour)."
     }
   },
   "files": [
     { "module": "api", "source": "sources/api/api.ts", "target": "src/foundation/api.ts" },
+    { "module": "api", "source": "sources/api/online.ts", "target": "src/foundation/online.ts" },
     { "module": "pwa", "source": "sources/pwa/register-service-worker.ts", "target": "src/foundation/register-service-worker.ts" },
     { "module": "pwa-shell", "source": "sources/pwa-shell/shell.css", "target": "src/foundation/shell.css" },
     { "module": "pwa-shell", "source": "sources/pwa-shell/viewport.ts", "target": "src/foundation/viewport.ts" },
     { "module": "pwa-shell", "source": "sources/pwa-shell/AppShell.tsx", "target": "src/foundation/AppShell.tsx" },
+    { "module": "pwa-shell", "source": "sources/pwa-shell/NavBadge.tsx", "target": "src/foundation/NavBadge.tsx" },
     { "module": "profile", "source": "sources/profile/profile.tsx", "target": "src/foundation/profile.tsx" },
     { "module": "profile", "source": "sources/profile/profile.css", "target": "src/foundation/profile.css" },
+    { "module": "profile", "source": "sources/profile/profile-theme.js", "target": "public/profile-theme.js" },
     { "module": "template", "source": "sources/pwa/sw.js", "target": "public/sw.js" },
     { "module": "template", "source": "sources/template/package.json", "target": "package.json" },
     { "module": "template", "source": "sources/template/pnpm-lock.yaml", "target": "pnpm-lock.yaml" },
@@ -36,6 +48,12 @@
     { "module": "template", "source": "sources/template/main.tsx", "target": "src/main.tsx" },
     { "module": "template", "source": "sources/template/vite-env.d.ts", "target": "src/vite-env.d.ts" },
     { "module": "template", "source": "sources/template/App.tsx", "target": "src/App.tsx" },
-    { "module": "template", "source": "sources/template/app.css", "target": "src/app.css" }
+    { "module": "template", "source": "sources/template/app.css", "target": "src/app.css" },
+    { "module": "push", "source": "sources/push/sw-push.js", "target": "public/sw-push.js" },
+    { "module": "push", "source": "sources/push/push.ts", "target": "src/foundation/push.ts" },
+    { "module": "palette", "source": "sources/palette/palette.ts", "target": "src/foundation/palette.ts" },
+    { "module": "palette", "source": "sources/palette/shortcuts.ts", "target": "src/foundation/shortcuts.ts" },
+    { "module": "scroll-edges", "source": "sources/scroll-edges/scroll-edges.ts", "target": "src/foundation/scroll-edges.ts" },
+    { "module": "scroll-edges", "source": "sources/scroll-edges/scroll-edges.css", "target": "src/foundation/scroll-edges.css" }
   ]
 }

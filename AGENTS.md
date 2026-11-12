@@ -21,6 +21,9 @@ stay in apps; local auth only on literal `127.0.0.1` with a loopback peer; never
 
 Managed in apps: registry modules `api`, `pwa`, `pwa-shell`, `profile` (`check`/`sync`); `public/sw.js` is a template
 copy (apps extend `sw-app.js`); everything else the scaffold writes belongs to the app.
+Also `push`, `palette`, `scroll-edges`: look-neutral mechanics only (handbook 0005), never colours,
+radii, shadows or fonts; their Node tests (`frontendregistry/testdata/*_test.mjs`) need Node 22.18+.
+`public/sw-push.js` and `public/profile-theme.js` are module files (checked), unlike `public/sw.js`.
 
 Change: tests for changed behaviour; in WSL `go vet ./... && go test -race ./...` (Node runs the sw.js test);
 commit to `main` without attribution; CI green (go, minimum-go, scaffold). Release: SemVer (breaking = new
