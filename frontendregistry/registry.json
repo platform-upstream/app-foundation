@@ -11,7 +11,7 @@
       "description": "iOS-standalone-safe mobile shell: large-viewport height, keyboard handling, nav as the last flex child, published nav height."
     },
     "profile": {
-      "description": "The signed-in person bottom left (photo from directory) opening a menu: de/en, light/dark, the app's own settings and the person's other apps; backend: Go package profile at /api/me."
+      "description": "The signed-in person bottom left (photo from directory) opening a menu: de/en, light/dark, the app's own settings and the person's other apps; backend: Go package profile at /api/me; public/profile-theme.js sets the stored theme before the first paint and keeps the theme-color meta in step."
     },
     "template": {
       "description": "Minimal React/Vite application with app-owned content, theme, query policy, top bar and nav on the shared shell.",
@@ -36,6 +36,7 @@
     { "module": "pwa-shell", "source": "sources/pwa-shell/AppShell.tsx", "target": "src/foundation/AppShell.tsx" },
     { "module": "profile", "source": "sources/profile/profile.tsx", "target": "src/foundation/profile.tsx" },
     { "module": "profile", "source": "sources/profile/profile.css", "target": "src/foundation/profile.css" },
+    { "module": "profile", "source": "sources/profile/profile-theme.js", "target": "public/profile-theme.js" },
     { "module": "template", "source": "sources/pwa/sw.js", "target": "public/sw.js" },
     { "module": "template", "source": "sources/template/package.json", "target": "package.json" },
     { "module": "template", "source": "sources/template/pnpm-lock.yaml", "target": "pnpm-lock.yaml" },
