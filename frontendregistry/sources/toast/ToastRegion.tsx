@@ -14,7 +14,7 @@ export interface ToastRegionProps {
   className?: string;
   /** Classes for each toast's element, which carries role status/alert and data-tone. */
   toastClassName?: string;
-  /** The region's accessible name, the app's copy (e.g. "Notifications"). */
+  /** The region's accessible name, the app's copy (e.g. "Notifications"); it makes the region a labelled landmark (role region). */
   label?: string;
   /** A toast's content; default: its text, the detail and the action button. */
   children?: (toast: Toast) => ReactNode;
@@ -38,7 +38,8 @@ export function ToastRegion({ className, toastClassName, label, children }: Toas
 
   if (!host) return null;
   return createPortal(
-    <div ref={region} className={['toast-region', className].filter(Boolean).join(' ')} aria-label={label}>
+    // A name needs a role: aria-label on a plain div is prohibited (axe aria-prohibited-attr).
+    <div ref={region} className={['toast-region', className].filter(Boolean).join(' ')} role={label ? 'region' : undefined} aria-label={label}>
       {toasts.map((toast) => (
         <div key={toast.id} role={toast.role} aria-atomic="true" data-tone={toast.tone} className={toastClassName}>
           {children ? (

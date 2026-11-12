@@ -92,3 +92,12 @@ func TestSheetToastPullInstall(t *testing.T) {
 		}
 	}
 }
+
+// aria-label on an element without a role is prohibited (axe aria-prohibited-attr, which the phone
+// audit reports): the labelled toast region is a region landmark.
+func TestToastRegionLabelHasARole(t *testing.T) {
+	source := readSource(t, "sources/toast/ToastRegion.tsx")
+	if !strings.Contains(source, "role={label ? 'region' : undefined} aria-label={label}") {
+		t.Fatal("ToastRegion must give its labelled region role=region")
+	}
+}
