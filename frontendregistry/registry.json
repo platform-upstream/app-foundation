@@ -16,6 +16,9 @@
     "template": {
       "description": "Minimal React/Vite application with app-owned content, theme, query policy, top bar and nav on the shared shell.",
       "requires": ["pwa", "pwa-shell"]
+    },
+    "push": {
+      "description": "Web Push: sw-push.js for the app's sw-app.js (checked payload, tag per subject, app badge, same-origin click that focuses before it navigates) and usePush/setAppBadge on the page."
     }
   },
   "files": [
@@ -36,6 +39,8 @@
     { "module": "template", "source": "sources/template/main.tsx", "target": "src/main.tsx" },
     { "module": "template", "source": "sources/template/vite-env.d.ts", "target": "src/vite-env.d.ts" },
     { "module": "template", "source": "sources/template/App.tsx", "target": "src/App.tsx" },
-    { "module": "template", "source": "sources/template/app.css", "target": "src/app.css" }
+    { "module": "template", "source": "sources/template/app.css", "target": "src/app.css" },
+    { "module": "push", "source": "sources/push/sw-push.js", "target": "public/sw-push.js" },
+    { "module": "push", "source": "sources/push/push.ts", "target": "src/foundation/push.ts" }
   ]
 }
