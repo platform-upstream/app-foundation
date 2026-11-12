@@ -157,6 +157,9 @@ func (c *Client) Stream(ctx context.Context, req Request, onEvent func(Event)) (
 				if delta.ID != "" {
 					call.ID = delta.ID
 				}
+				if len(delta.Extra) > 0 && string(delta.Extra) != "null" {
+					call.Extra = delta.Extra
+				}
 				call.Name += delta.Function.Name
 				call.Arguments += delta.Function.Arguments
 				if len(call.Arguments) > maxToolArguments {

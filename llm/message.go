@@ -29,6 +29,9 @@ type ToolCall struct {
 	ID        string
 	Name      string
 	Arguments string
+	// Extra is the call's extra_content as the backend sent it (Gemini 3 keeps its thought
+	// signature there and rejects or degrades a replayed call without it); sent back unchanged.
+	Extra json.RawMessage
 }
 
 func (t Tool) MarshalJSON() ([]byte, error) {
@@ -42,9 +45,13 @@ func (t Tool) MarshalJSON() ([]byte, error) {
 }
 
 func (c ToolCall) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]any{"id": c.ID, "type": "function", "function": map[string]string{
+	out := map[string]any{"id": c.ID, "type": "function", "function": map[string]string{
 		"name": c.Name, "arguments": c.Arguments,
-	}})
+	}}
+	if len(c.Extra) > 0 && string(c.Extra) != "null" {
+		out["extra_content"] = c.Extra
+	}
+	return json.Marshal(out)
 }
 
 // Part is a piece of a multi-part message.

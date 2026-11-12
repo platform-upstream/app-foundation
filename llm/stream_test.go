@@ -61,18 +61,22 @@ func TestStreamTextAndThinking(t *testing.T) {
 func TestStreamToolCalls(t *testing.T) {
 	tool := llm.Tool{Name: "web_search", Description: "Search.", Parameters: []byte(`{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}`)}
 	resp, events, err, sent := stream(t, []string{
-		`{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-1","type":"function","function":{"name":"web_","arguments":"{\"query\":\""}}]}}]}`,
+		`{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-1","type":"function","extra_content":{"google":{"thought_signature":"sig-1"}},"function":{"name":"web_","arguments":"{\"query\":\""}}]}}]}`,
 		`{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"name":"search","arguments":"news\"}"}}]},"finish_reason":"tool_calls"}]}`,
 		`[DONE]`,
 	}, llm.Request{
 		Messages: []llm.Message{
 			{Role: "user", Content: "News?"},
-			{Role: "assistant", ToolCalls: []llm.ToolCall{{ID: "call-0", Name: "web_search", Arguments: `{"query":"old"}`}}},
+			{Role: "assistant", ToolCalls: []llm.ToolCall{{ID: "call-0", Name: "web_search", Arguments: `{"query":"old"}`, Extra: []byte(`{"google":{"thought_signature":"sig-0"}}`)}}},
 			{Role: "tool", ToolCallID: "call-0", Content: "Result"},
 		},
 		Tools: []llm.Tool{tool},
 	})
-	if err != nil || len(resp.ToolCalls) != 1 || resp.ToolCalls[0] != (llm.ToolCall{ID: "call-1", Name: "web_search", Arguments: `{"query":"news"}`}) {
+	if err != nil || len(resp.ToolCalls) != 1 {
+		t.Fatalf("resp = %+v, err = %v", resp, err)
+	}
+	// Gemini 3's thought signature comes back with the call and must be replayed with it.
+	if c := resp.ToolCalls[0]; c.ID != "call-1" || c.Name != "web_search" || c.Arguments != `{"query":"news"}` || string(c.Extra) != `{"google":{"thought_signature":"sig-1"}}` {
 		t.Fatalf("resp = %+v, err = %v", resp, err)
 	}
 	if len(events) != 2 || events[0].Kind != llm.EventToolCall {
@@ -82,7 +86,7 @@ func TestStreamToolCalls(t *testing.T) {
 	for _, want := range []string{
 		`"tool_choice":"auto"`,
 		`"tools":[{"function":{"description":"Search.","name":"web_search","parameters":{"type":"object"`,
-		`"tool_calls":[{"function":{"arguments":"{\"query\":\"old\"}","name":"web_search"},"id":"call-0","type":"function"}]`,
+		`"tool_calls":[{"extra_content":{"google":{"thought_signature":"sig-0"}},"function":{"arguments":"{\"query\":\"old\"}","name":"web_search"},"id":"call-0","type":"function"}]`,
 		`"tool_call_id":"call-0"`,
 	} {
 		if !strings.Contains(raw, want) {

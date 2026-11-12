@@ -54,7 +54,7 @@ func decode(data []byte) (Response, error) {
 	}
 	resp.Content, resp.Reasoning = splitThinking(contentText(choice.Message.Content), choice.Message.ReasoningContent+choice.Message.Reasoning)
 	for _, call := range choice.Message.ToolCalls {
-		resp.ToolCalls = append(resp.ToolCalls, ToolCall{ID: call.ID, Name: call.Function.Name, Arguments: call.Function.Arguments})
+		resp.ToolCalls = append(resp.ToolCalls, ToolCall{ID: call.ID, Name: call.Function.Name, Arguments: call.Function.Arguments, Extra: call.Extra})
 	}
 	return finish(resp)
 }
@@ -71,8 +71,9 @@ func finish(resp Response) (Response, error) {
 }
 
 type wireToolCall struct {
-	Index    int    `json:"index"`
-	ID       string `json:"id"`
+	Index    int             `json:"index"`
+	ID       string          `json:"id"`
+	Extra    json.RawMessage `json:"extra_content"`
 	Function struct {
 		Name      string `json:"name"`
 		Arguments string `json:"arguments"`
