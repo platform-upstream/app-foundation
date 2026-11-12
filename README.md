@@ -25,7 +25,8 @@ The initial packages are:
   and PWA lifecycle; it shares no theme or layout.
 - `llm`: the portable LLM gateway client (completion, JSON-schema output, streaming with tools) and its `llmtest` fake.
 - `push`: Web Push (VAPID) delivery to the subscriptions an app stores, with the endpoint
-  allowlist, subscription bound and the Apple `mailto:` fix that Omni and Console each carried.
+  allowlist, subscription bound and the Apple `mailto:` fix that Omni and Console each carried;
+  `Notify` hands the owner's messages to a platform's hub instead, when one is configured.
 - `memory`: the proven shared Memory service client, including the identical Cook/Watch SQLite
   cache, durable outbox, and conflict behavior.
 - `server`: explicit HTTP server limits, shallow liveness (`Health`), bounded readiness (`Ready`),
@@ -48,7 +49,7 @@ it replaced the former reference application.
 ## Use
 
 API detail and runnable usage live in the packages: `go doc <package>` shows each package's example
-(`example_test.go` in `access`, `server`, `sqlite`, `web`). This README keeps the design decisions.
+(`example_test.go` in `access`, `push`, `server`, `sqlite`, `web`). This README keeps the design decisions.
 
 ## Design decisions
 
@@ -122,6 +123,18 @@ ceiling and reasoning effort on every request, no backend-specific switches, no 
 never logged, and a disabled client (`ErrDisabled`) without a key so the app runs without
 inference. Prompts, schemas, tool loops, ceilings and caches stay in apps. Design and rollout:
 `docs/llm/shared-llm-client-proposal.md` in the workspace repository.
+
+**Push hub.** A platform may have one app that tells the owner for every app, so the owner hears
+one voice. `push.Config.Hub` (its in-cluster notify route and the app's key there, sent the way
+`access.Internal` reads it) is off while empty, and only `Notify` uses it: a structured message
+(title, body, a reference `<app>:<noun>/<id>`, urgency now or later, a stable id) goes to the
+hub, and the app's own web push with its own payload goes out only without a hub or when the hub
+fails (unreachable, slower than five seconds, 401/403/5xx). A message the hub calls invalid (400) is the
+app's bug and is returned, not sent another way, and neither is one over the hub's bound (429); `Notify` checks the hub's rules on every
+platform, so it fails the same without a hub. The hub tells one person: `Hub` goes only on a
+`Sender` whose subscriptions are the owner's (an app with one `Sender` per person sets it on the
+owner's alone); `Notify` has no audience, and `Send` and `SendTo` never reach the hub. Copy, payload
+shapes and what is urgent stay in apps.
 
 **Google grants.** `googleauth` is the consent flow and token handling Omni and Paper each carried,
 on `golang.org/x/oauth2` (Google's endpoint from `endpoints`, not the `google` package, which would

@@ -22,18 +22,31 @@
 // and store each device with SubscribeTo, then reach one person's devices with SendTo. Only
 // SubscribeTo and SendTo read or write the column, so an application without it keeps working
 // with Subscribe and Send unchanged.
+//
+// On a platform where one app, a hub, tells the owner for all apps, an application sets
+// Config.Hub and tells the owner with Notify: the message goes to the hub, and to the app's own
+// subscriptions only when there is no hub or the hub fails. Send and SendTo never reach the hub.
+// The hub tells one person, the owner: set Config.Hub only on a Sender whose subscriptions are the
+// owner's. An application with one Sender per person sets it on the owner's Sender and on no other,
+// or every person's messages land with the owner.
 package push
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	webpush "github.com/SherClockHolmes/webpush-go"
 )
@@ -43,13 +56,33 @@ const (
 	MaxSubscriptions = 20
 	maxEndpoint      = 4096
 	sendTimeout      = 5 * time.Second
+
+	hubTimeout   = 5 * time.Second
+	maxHubReply  = 4 << 10
+	maxHubReason = 200
+	// minHubKey is access.MinInternalKeyLength, the shortest key the hub's guard accepts.
+	minHubKey = 32
+	maxTitle  = 120
+	maxBody   = 500
 )
 
 var (
 	ErrDisabled            = errors.New("push is not configured")
 	ErrInvalidSubscription = errors.New("invalid push subscription")
 	ErrSubscriptionLimit   = errors.New("too many push subscriptions")
+	// ErrInvalidMessage: Notify sent nothing, because the Message breaks its rules or the hub
+	// answered 400. The application fixes the message; nothing retries it.
+	ErrInvalidMessage = errors.New("invalid push message")
+	// ErrHubFailed: the hub did not take a message (misconfigured, unreachable, timed out, or
+	// answered other than 2xx or 400), so Notify sent the web push instead; after a 429 it sent
+	// nothing.
+	ErrHubFailed = errors.New("push hub did not take the message")
+	// errHubLimit marks the hub's 429: the app tells the owner too much, so nothing goes another way.
+	errHubLimit = errors.New("too many messages")
 )
+
+// refPattern is an app reference, <app>:<noun>/<id>.
+var refPattern = regexp.MustCompile(`^[^\s:/]+:[^\s:/]+/\S+$`)
 
 // Config is the VAPID key pair and contact. Push is off unless all three are set.
 type Config struct {
@@ -60,6 +93,84 @@ type Config struct {
 	HTTPClient *http.Client
 	// TTL is how long the push service keeps an undelivered message; 0 means one hour.
 	TTL time.Duration
+	// Hub hands Notify's messages to the platform's hub; off while its URL is empty.
+	Hub HubConfig
+}
+
+// HubConfig locates the hub, the app that tells the owner for every app on the platform. It
+// belongs only on a Sender whose subscriptions are the owner's: the hub cannot tell whose message
+// it gets.
+type HubConfig struct {
+	// URL is the hub's in-cluster notify route, such as http://hub.example.svc/internal/notify.
+	URL string
+	// Key is this app's bearer key at the hub, at least 32 characters (access.Internal's minimum).
+	Key string
+}
+
+// check reports why the hub cannot be called; the values are not repeated, the key may be among them.
+func (h HubConfig) check() error {
+	u, err := url.Parse(h.URL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil ||
+		u.RawQuery != "" || u.Fragment != "" {
+		return errors.New("hub URL must be an absolute http(s) URL without credentials, query or fragment")
+	}
+	if len(h.Key) < minHubKey {
+		return fmt.Errorf("hub key must have at least %d characters", minHubKey)
+	}
+	return nil
+}
+
+// Urgency says when the hub tells the owner.
+type Urgency string
+
+const (
+	// UrgencyNow: the hub pushes at once. It is what the zero value means.
+	UrgencyNow Urgency = "now"
+	// UrgencyLater: the hub keeps the message and tells the owner with its next digest.
+	UrgencyLater Urgency = "later"
+)
+
+// Message is what Notify tells the owner, in the hub's terms. Notify checks the rules below with
+// or without a hub, so a message that works on one platform works on every one.
+type Message struct {
+	// Title is required, at most 120 characters.
+	Title string
+	// Body is optional, at most 500 characters.
+	Body string
+	// Ref is optional: the thing the message is about as an app reference <app>:<noun>/<id>, such
+	// as acme:invoice/42, which the hub links back into the app. Not a URL.
+	Ref string
+	// Urgency is UrgencyNow (also the zero value) or UrgencyLater.
+	Urgency Urgency
+	// ID is optional and stable: a message with the same ID replaces the earlier one at the hub.
+	ID string
+}
+
+func (m Message) validate() error {
+	var problem string
+	switch {
+	case strings.TrimSpace(m.Title) == "":
+		problem = "a title is required"
+	case utf8.RuneCountInString(m.Title) > maxTitle:
+		problem = fmt.Sprintf("the title has more than %d characters", maxTitle)
+	case utf8.RuneCountInString(m.Body) > maxBody:
+		problem = fmt.Sprintf("the body has more than %d characters", maxBody)
+	case m.Ref != "" && !refPattern.MatchString(m.Ref):
+		problem = "the ref is not <app>:<noun>/<id>"
+	case m.Urgency != "" && m.Urgency != UrgencyNow && m.Urgency != UrgencyLater:
+		problem = fmt.Sprintf("unknown urgency %q", string(m.Urgency))
+	default:
+		return nil
+	}
+	return fmt.Errorf("%w: %s", ErrInvalidMessage, problem)
+}
+
+// Delivery is where Notify's message went.
+type Delivery struct {
+	// Hub: the hub took the message; no web push was sent.
+	Hub bool
+	// Devices counts the push services that accepted the app's own web push.
+	Devices int
 }
 
 // Subscription is what the browser's PushManager.subscribe() returns, as JSON.
@@ -77,6 +188,9 @@ type Sender struct {
 	db   *sql.DB
 	cfg  Config
 	send func(context.Context, []byte, *webpush.Subscription) (*http.Response, error)
+	// hub calls the hub, apart from the push services' client; hubErr is why it cannot.
+	hub    *http.Client
+	hubErr error
 }
 
 // New returns a Sender over the application's database.
@@ -100,12 +214,26 @@ func New(db *sql.DB, cfg Config) *Sender {
 			VAPIDPublicKey: cfg.PublicKey, VAPIDPrivateKey: cfg.PrivateKey,
 		})
 	}
+	if cfg.Hub.URL != "" {
+		// The key never follows a redirect.
+		s.hub = &http.Client{Timeout: hubTimeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+		if s.hubErr = cfg.Hub.check(); s.hubErr != nil {
+			// Said once at start: later only Notify's error shows it. The text carries no values.
+			slog.Warn("push: hub not usable, Notify falls back to web push", "error", s.hubErr)
+		}
+	}
 	return s
 }
 
 // Enabled reports whether the key pair and contact are configured.
 func (s *Sender) Enabled() bool {
 	return s != nil && s.cfg.PublicKey != "" && s.cfg.PrivateKey != "" && s.cfg.Subject != ""
+}
+
+// HubEnabled reports whether a hub URL is configured, so Notify tries the hub first. An app
+// whose own web push is off (Enabled false) still tells the owner through Notify when it is on.
+func (s *Sender) HubEnabled() bool {
+	return s != nil && s.hub != nil
 }
 
 // PublicKey is the VAPID public key the page passes to PushManager.subscribe().
@@ -218,6 +346,93 @@ func (s *Sender) Send(ctx context.Context, payload []byte) (int, error) {
 // the audience column (see the package documentation).
 func (s *Sender) SendTo(ctx context.Context, audience string, payload []byte) (int, error) {
 	return s.deliver(ctx, payload, "SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE audience = ? LIMIT ?", audience, MaxSubscriptions)
+}
+
+// Notify tells the owner msg. With a hub configured it hands msg to the hub, one POST with a
+// five-second limit, and sends no web push. Without one, or when the hub fails, it sends payload,
+// the message the app's service worker expects, as Send does: to every stored subscription.
+//
+// An invalid msg, or one the hub answers 400, sends nothing and returns ErrInvalidMessage. A hub
+// that is misconfigured, unreachable, slow, or refuses (401, 403, 5xx, any other status) is
+// not asked again: Notify sends the web push and returns ErrHubFailed with the hub's reason,
+// joined with Send's error if that failed too. Delivery says what reached the owner: Hub, or
+// Devices > 0 even when the error is ErrHubFailed. A hub that answers 429 bounds how much an app
+// tells the owner: nothing is sent and ErrHubFailed is returned. Like Send it is synchronous.
+//
+// Notify has no audience: it is for the owner, whose devices Send must reach on a Sender with a
+// hub (see HubConfig). Messages for other people go through SendTo, or through a Sender without a
+// hub; neither reaches it.
+func (s *Sender) Notify(ctx context.Context, msg Message, payload []byte) (Delivery, error) {
+	if err := msg.validate(); err != nil {
+		return Delivery{}, err
+	}
+	var hubErr error
+	if s.HubEnabled() {
+		if hubErr = s.forward(ctx, msg); hubErr == nil {
+			return Delivery{Hub: true}, nil
+		}
+		if errors.Is(hubErr, ErrInvalidMessage) || errors.Is(hubErr, errHubLimit) {
+			return Delivery{}, hubErr
+		}
+	}
+	devices, err := s.Send(ctx, payload)
+	return Delivery{Devices: devices}, errors.Join(hubErr, err)
+}
+
+// hubMessage is the hub's request body; empty optional fields are left out.
+type hubMessage struct {
+	Title   string  `json:"title"`
+	Body    string  `json:"body,omitempty"`
+	Ref     string  `json:"ref,omitempty"`
+	Urgency Urgency `json:"urgency"`
+	ID      string  `json:"id,omitempty"`
+}
+
+// forward posts msg to the hub. Any 2xx means it took the message.
+func (s *Sender) forward(ctx context.Context, msg Message) error {
+	if s.hubErr != nil {
+		return fmt.Errorf("%w: %w", ErrHubFailed, s.hubErr)
+	}
+	if msg.Urgency == "" {
+		msg.Urgency = UrgencyNow
+	}
+	body, err := json.Marshal(hubMessage{Title: msg.Title, Body: msg.Body, Ref: msg.Ref, Urgency: msg.Urgency, ID: msg.ID})
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrHubFailed, err)
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, s.cfg.Hub.URL, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrHubFailed, err)
+	}
+	request.Header.Set("Authorization", "Bearer "+s.cfg.Hub.Key)
+	request.Header.Set("Content-Type", "application/json")
+	response, err := s.hub.Do(request)
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrHubFailed, err)
+	}
+	defer response.Body.Close()
+	reply, _ := io.ReadAll(io.LimitReader(response.Body, maxHubReply))
+	if response.StatusCode >= 200 && response.StatusCode < 300 {
+		return nil
+	}
+	reason := fmt.Sprintf("HTTP %d", response.StatusCode)
+	var answer struct {
+		Error string `json:"error"`
+	}
+	if json.Unmarshal(reply, &answer) == nil && strings.TrimSpace(answer.Error) != "" {
+		text := strings.TrimSpace(answer.Error)
+		if runes := []rune(text); len(runes) > maxHubReason {
+			text = string(runes[:maxHubReason]) + "…"
+		}
+		reason += ": " + text
+	}
+	if response.StatusCode == http.StatusBadRequest {
+		return fmt.Errorf("%w: hub answered %s", ErrInvalidMessage, reason)
+	}
+	if response.StatusCode == http.StatusTooManyRequests {
+		return fmt.Errorf("%w: %w: %s", ErrHubFailed, errHubLimit, reason)
+	}
+	return fmt.Errorf("%w: %s", ErrHubFailed, reason)
 }
 
 // deliver sends payload to the subscriptions query selects as (endpoint, p256dh, auth).

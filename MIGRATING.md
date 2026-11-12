@@ -1,3 +1,29 @@
+# Migrating to v1.10.0
+
+Compatible; nothing changes without the new configuration. `push` can hand the owner's messages
+to a platform's hub, an app that tells the owner for every app, instead of sending its own web
+push. To opt in:
+
+- Only for the owner: the hub tells one person. Set `Hub` only on a `Sender` whose subscriptions
+  are the owner's; an app with one `Sender` per person sets it on the owner's and on no other.
+- Config: `push.Config.Hub` with `URL` and `Key`, from `PUSH_HUB_URL` and `PUSH_HUB_KEY`. The URL
+  is the hub's in-cluster notify route, the key this app's bearer key there (at least 32
+  characters, the hub's `access.Internal` caller key). Both unset: no hub. Keep the VAPID keys
+  while the hub runs: they are the fallback.
+- Code: where the app tells the owner, `sender.Notify(ctx, push.Message{Title, Body, Ref, Urgency,
+  ID}, payload)` instead of `sender.Send(ctx, payload)`. `payload` is the app's existing
+  service-worker message; it goes out when there is no hub or the hub fails. `Ref` is an app
+  reference (`acme:invoice/42`), not a URL. `UrgencyLater` waits for the hub's digest; the zero
+  value is `UrgencyNow`. The same `ID` replaces an earlier message at the hub.
+- Errors: `ErrInvalidMessage` (a title of 1 to 120 characters, a body up to 500, the ref's shape,
+  or the hub answered 400) sent nothing, on every platform. `ErrHubFailed` means the web push went
+  instead; `Delivery.Devices` says whether it reached a device (after the hub's 429, too many
+  messages, nothing went). Log both.
+- An app with the hub and no VAPID keys gates on `Enabled() || HubEnabled()`, not `Enabled()`.
+
+`Send` and `SendTo` are unchanged and never reach the hub: messages for other people stay on
+`SendTo` or on a `Sender` without `Hub`, and a test push for the app's own devices on `Send`.
+
 # Migrating to v1.9.0
 
 Compatible; nothing changes without the new variable. `APP_SNAPSHOT_AT=HH:MM` (24h) takes the
