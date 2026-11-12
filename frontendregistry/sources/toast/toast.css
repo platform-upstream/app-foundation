@@ -1,0 +1,36 @@
+/* Toast placement (app-foundation registry module `toast`). Registry-owned: do not edit in an
+   application. Only where the region sits: the toasts' background, colour, radius, shadow, gap,
+   width and animation belong to the application. Import after shell.css, before the app's CSS. */
+@layer foundation {
+  /* A manual popover (toastRegion) at the bottom, above the nav. --shell-nav-height already holds
+     the home-indicator inset (the nav pads it), so it is not added again; without a nav the inset
+     alone keeps toasts clear of the home indicator. The UA popover box is reset. */
+  .toast-region {
+    position: fixed;
+    inset: auto 0 max(var(--shell-nav-height, 0px), env(safe-area-inset-bottom, 0px)) 0;
+    width: auto;
+    height: auto;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    border: 0;
+    padding: 0;
+    overflow: visible;
+    background: transparent;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+  }
+
+  .toast-region > * {
+    pointer-events: auto;
+  }
+
+  /* While the soft keyboard is open (pwa-shell) the bottom is behind it: the top of the visible
+     area instead. */
+  html.keyboard-open .toast-region {
+    inset: calc(var(--vv-offset-top, 0px) + env(safe-area-inset-top, 0px)) 0 auto 0;
+  }
+}

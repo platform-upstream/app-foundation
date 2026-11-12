@@ -28,11 +28,13 @@ func runNodeTSTest(t *testing.T, script, source string) {
 
 func TestSheetLogic(t *testing.T) { runNodeTSTest(t, "sheet_test.mjs", "sheet/sheet.ts") }
 
+func TestToastStore(t *testing.T) { runNodeTSTest(t, "toast_test.mjs", "toast/toast.ts") }
+
 // Mechanics modules carry no look: their CSS sits in the foundation layer (app rules win) and
-// sets no colour, radius, shadow, font or backdrop.
+// sets no colour, radius, shadow, font or backdrop; only resets of the UA popover/dialog box.
 func TestSheetToastPullCSSIsLookNeutral(t *testing.T) {
-	look := regexp.MustCompile(`(?m)^\s*(color|background(-color|-image)?|border-radius|box-shadow|font(-family|-size|-weight)?|backdrop-filter|outline-color|fill|stroke)\s*:`)
-	for _, name := range []string{"sources/sheet/sheet.css"} {
+	look := regexp.MustCompile(`(?m)^\s*(color|background(?:-color|-image)?|border-radius|box-shadow|font(?:-family|-size|-weight)?|backdrop-filter|outline-color|fill|stroke)\s*:\s*([^;]+);`)
+	for _, name := range []string{"sources/sheet/sheet.css", "sources/toast/toast.css"} {
 		raw, err := content.ReadFile(name)
 		if err != nil {
 			t.Fatal(err)
@@ -41,8 +43,12 @@ func TestSheetToastPullCSSIsLookNeutral(t *testing.T) {
 		if !strings.Contains(css, "@layer foundation {") {
 			t.Errorf("%s must stay in @layer foundation", name)
 		}
-		if match := look.FindString(css); match != "" {
-			t.Errorf("%s sets a look value: %q", name, strings.TrimSpace(match))
+		for _, match := range look.FindAllStringSubmatch(css, -1) {
+			switch strings.TrimSpace(match[2]) {
+			case "transparent", "inherit", "none":
+			default:
+				t.Errorf("%s sets a look value: %q", name, strings.TrimSpace(match[0]))
+			}
 		}
 	}
 }
@@ -52,24 +58,32 @@ func TestSheetToastPullInstall(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	target := t.TempDir()
-	if err := registry.Install(target, "sheet"); err != nil {
-		t.Fatal(err)
+	modules := map[string][]string{
+		"sheet": {"src/foundation/sheet.ts", "src/foundation/useSheet.ts", "src/foundation/sheet.css"},
+		"toast": {"src/foundation/toast.ts", "src/foundation/ToastRegion.tsx", "src/foundation/toast.css"},
 	}
-	for _, name := range []string{"src/foundation/sheet.ts", "src/foundation/useSheet.ts", "src/foundation/sheet.css"} {
-		if _, err := os.Stat(filepath.Join(target, filepath.FromSlash(name))); err != nil {
-			t.Fatalf("%s: %v", name, err)
+	for module, files := range modules {
+		target := t.TempDir()
+		if err := registry.Install(target, module); err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range files {
+			if _, err := os.Stat(filepath.Join(target, filepath.FromSlash(name))); err != nil {
+				t.Fatalf("%s: %s: %v", module, name, err)
+			}
+		}
+		if differences, err := registry.Check(target, module); err != nil || len(differences) != 0 {
+			t.Fatalf("%s: check = %#v, %v", module, differences, err)
 		}
 	}
-	if differences, err := registry.Check(target, "sheet"); err != nil || len(differences) != 0 {
-		t.Fatalf("check = %#v, %v", differences, err)
-	}
-	// The vanilla core must not need React.
-	core, err := content.ReadFile("sources/sheet/sheet.ts")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(core), "from 'react'") {
-		t.Fatal("sheet.ts imports React; keep it usable without")
+	// The cores must not need React, so apps without it can use them.
+	for _, core := range []string{"sources/sheet/sheet.ts", "sources/toast/toast.ts"} {
+		raw, err := content.ReadFile(core)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(raw), "from 'react") {
+			t.Fatalf("%s imports React; keep it usable without", core)
+		}
 	}
 }
