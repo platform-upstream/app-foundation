@@ -17,7 +17,7 @@ export function App() {
           <a href="/" aria-current="page">Notes</a>
         </nav>
       }
-      mainProps={{ id: 'main-content', tabIndex: -1 }}
+      mainProps={{ id: 'main-content', tabIndex: -1, className: 'no-pan-x' }}
     >
       <NotesPage />
     </AppShell>

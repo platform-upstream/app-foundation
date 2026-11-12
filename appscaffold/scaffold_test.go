@@ -66,7 +66,7 @@ func TestGenerateRendersCompleteApp(t *testing.T) {
 		".ci/pipeline.yaml":                   {"name: field-notes"},
 		"AGENTS.md":                           {"https://field-notes.apps.example.org", "Vite on 127.0.0.1:5250", "cfTeamDomain: acme.cloudflareaccess.com", "caller-field-notes-key"},
 		"CLAUDE.md":                           {"@AGENTS.md"},
-		"web/index.html":                      {`<html lang="de">`, `<title>Field Notes: Familie</title>`, `content="Field Notes: Familie" />`, `href="/pwa/icon-180.png"`},
+		"web/index.html":                      {`<html lang="de" class="no-pan-x">`, `<title>Field Notes: Familie</title>`, `content="Field Notes: Familie" />`, `href="/pwa/icon-180.png"`},
 		"web/public/pwa/manifest.webmanifest": {`"name": "Field Notes: Familie"`, `"lang": "de"`},
 		"web/package.json":                    {`"name": "field-notes-web"`},
 		"web/src/main.tsx":                    {`registerServiceWorker({ name: 'field-notes' });`},

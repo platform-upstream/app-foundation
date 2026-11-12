@@ -290,7 +290,7 @@ func Generate(target string, options Options) error {
 func personalize(tree *sourcetree.Tree, o Options) error {
 	edits := map[string][][2]string{
 		"web/index.html": {
-			{`<html lang="en">`, `<html lang="` + o.Lang + `">`},
+			{`<html lang="en" class="no-pan-x">`, `<html lang="` + o.Lang + `" class="no-pan-x">`},
 			{`content="Foundation" />`, `content="` + o.Title + `" />`},
 			{`<title>Foundation app</title>`, `<title>` + o.Title + `</title>`},
 		},

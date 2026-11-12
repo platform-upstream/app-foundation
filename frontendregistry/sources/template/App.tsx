@@ -15,7 +15,8 @@ export function App() {
           <a href="/" aria-current="page">Overview</a>
         </nav>
       }
-      mainProps={{ id: 'main-content', tabIndex: -1 }}
+      // no-pan-x (touch.css) on the scroller, html and body: the page never pans or swipes back sideways.
+      mainProps={{ id: 'main-content', tabIndex: -1, className: 'no-pan-x' }}
     >
       <div className="page">
         <p className="eyebrow">Reference shell</p>

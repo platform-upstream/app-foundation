@@ -3,7 +3,10 @@ import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from './App.js';
 import { registerServiceWorker } from './foundation/register-service-worker.js';
+// Foundation CSS (all in @layer foundation) first, the application's own CSS last, so it wins.
 import './foundation/shell.css';
+import './foundation/touch.css';
+import './foundation/motion.css';
 import './app.css';
 
 // Query timing and retry behavior are application policy, so the template keeps them visible.
