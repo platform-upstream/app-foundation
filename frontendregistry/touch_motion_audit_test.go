@@ -50,6 +50,12 @@ func TestTouchIsLookNeutralAndLayered(t *testing.T) {
 	if !strings.Contains(coarse[1], "input:not([type='checkbox'], [type='radio']") {
 		t.Fatal("44px floor must exclude checkboxes and radios")
 	}
+	// A .hit-target keeps its small look: the ::after takes the finger, not a min-height.
+	for _, want := range []string{"button:not(.hit-target)", "select:not(.hit-target)", ", .hit-target))"} {
+		if !strings.Contains(coarse[1], want) {
+			t.Fatalf("44px floor must exclude .hit-target (%q)", want)
+		}
+	}
 	for _, want := range []string{"touch-action: manipulation", "-webkit-tap-highlight-color: transparent", "text-size-adjust: 100%",
 		"inset: min(0px, calc((100% - 44px) / 2))", "overflow-x: clip", "overscroll-behavior-x: none"} {
 		if !strings.Contains(css, want) {
