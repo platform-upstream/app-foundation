@@ -85,4 +85,40 @@
     position: relative;
     top: var(--vv-offset-top, 0px);
   }
+
+  /* Nav badge (NavBadge.tsx): a count or a dot at a nav item's icon. .nav-badge-anchor wraps the
+     icon; the badge sits over its top end corner out of flow, so appearing, growing to 99+ or
+     going never moves the icon or the label. Geometry only: background, colour, radius, ring and
+     font family are the application's (.nav-badge, [data-tone]); sizes via the variables. */
+  .nav-badge-anchor {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .nav-badge {
+    position: absolute;
+    top: var(--nav-badge-top, -4px);
+    inset-inline-start: calc(100% - var(--nav-badge-overlap, 8px));
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--nav-badge-size, 18px);
+    min-width: var(--nav-badge-size, 18px);
+    padding-inline: 4px;
+    font-size: var(--nav-badge-font-size, 11px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .nav-badge[data-dot] {
+    top: var(--nav-badge-dot-top, 0px);
+    inset-inline-start: calc(100% - var(--nav-badge-dot, 10px) / 2);
+    width: var(--nav-badge-dot, 10px);
+    height: var(--nav-badge-dot, 10px);
+    min-width: 0;
+    padding: 0;
+  }
 }
