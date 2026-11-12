@@ -10,6 +10,8 @@
   #wide { width: 600px; height: 40px; background: #eee; }
   #cramped { width: 60px; white-space: nowrap; }
   #split { width: 40px; word-break: break-all; }
+  #stuffed { display: flex; width: 50px; padding: 0; border: 0; }
+  #stuffed span { flex: none; width: 100px; height: 20px; }
   #tiny { width: 24px; height: 24px; min-height: 0; padding: 0; }
   #small-input { font-size: 13px; }
   #fine-print { font-size: 11px; }
@@ -23,6 +25,7 @@
   <div id="content">
     <div id="wide">Zu breit</div>
     <button id="cramped" type="button">Rechnungen</button>
+    <button id="stuffed" type="button" aria-label="Voll"><span></span></button>
     <p id="split">1234567890123</p>
     <button id="tiny" type="button" aria-label="Schliessen">x</button>
     <input id="small-input" type="text" aria-label="Betrag">

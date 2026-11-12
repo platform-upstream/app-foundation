@@ -10,10 +10,13 @@
  *   sideways-pan       a real touch swipe moves the page, the visual viewport or the main scroller
  *                      sideways, zooms, or navigates (Chromium only: CDP touch events)
  *   text-overflow      text runs out of its button, link or other control (ellipsis and line clamp
- *                      are intended and pass)
+ *                      are intended and pass; visually hidden text such as .sr-only and absolutely
+ *                      positioned children and pseudo-elements, as a NavBadge or .hit-target's
+ *                      ::after, are left out)
  *   number-split       a number is broken across two lines
  *   tap-target         a control is smaller than 44 x 44 (an invisible ::before/::after that grows
- *                      the target, as .hit-target in `touch`, counts; inline links in text pass)
+ *                      the target, as .hit-target in `touch` or a stretched link's ::after over its
+ *                      positioned card, counts; inline links in text pass)
  *   input-font         a field's font is under 16px (iOS zooms in on focus)
  *   small-text         text under 14px
  *   autofocus          a field is focused right after load (on touch the keyboard opens and
@@ -196,6 +199,26 @@ function domChecks(options: DomOptions): Finding[] {
     }
     return parts.join(' > ');
   };
+  // Visually hidden text for screen readers (.sr-only: a 1px absolute box, clip or clip-path) is
+  // not on screen, so it neither overflows nor splits nor is small.
+  const visuallyHidden = (el: Element) => {
+    for (let a: Element | null = el; a && a !== document.body; a = a.parentElement) {
+      const style = getComputedStyle(a);
+      if (style.position !== 'absolute' && style.position !== 'fixed') continue;
+      const rect = a.getBoundingClientRect();
+      if ((rect.width <= 1 && rect.height <= 1) || /^rect\(0(px)?,? 0(px)?,? 0(px)?,? 0(px)?\)$/.test(style.clip) || /^inset\(50%\)$/.test(style.clipPath)) return true;
+    }
+    return false;
+  };
+  // Out of flow inside a control (a NavBadge over its icon, a positioned decoration): placed on
+  // purpose, so not measured against the control.
+  const outOfFlowWithin = (el: Element, stop: Element) => {
+    for (let a: Element | null = el; a && a !== stop; a = a.parentElement) {
+      const position = getComputedStyle(a).position;
+      if (position === 'absolute' || position === 'fixed') return true;
+    }
+    return false;
+  };
   const text = (el: Element) => ((el as HTMLElement).innerText || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().slice(0, 60);
   const vw = document.documentElement.clientWidth;
   const round = (n: number) => Math.round(n * 10) / 10;
@@ -251,7 +274,7 @@ function domChecks(options: DomOptions): Finding[] {
     const walker = document.createTreeWalker(control, NodeFilter.SHOW_TEXT);
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       const owner = node.parentElement;
-      if (!node.nodeValue?.trim() || !owner || owner.closest(controlSelector) !== control || !visible(owner) || truncated(owner, control)) continue;
+      if (!node.nodeValue?.trim() || !owner || owner.closest(controlSelector) !== control || !visible(owner) || visuallyHidden(owner) || outOfFlowWithin(owner, control) || truncated(owner, control)) continue;
       range.selectNodeContents(node);
       const slack = Math.max(2.5, 0.3 * parseFloat(getComputedStyle(owner).fontSize));
       for (const line of range.getClientRects()) {
@@ -263,8 +286,25 @@ function domChecks(options: DomOptions): Finding[] {
       }
     }
     const style = getComputedStyle(control);
-    if (control.clientWidth > 0 && control.scrollWidth > control.clientWidth + 1 && !/(auto|scroll)/.test(style.overflowX) && !truncated(control, control))
-      add({ check: 'text-overflow', selector: describe(control), text: text(control), detail: `content ${control.scrollWidth}px wide in ${control.clientWidth}px` });
+    if (control.clientWidth > 0 && control.scrollWidth > control.clientWidth + 1 && !/(auto|scroll)/.test(style.overflowX) && !truncated(control, control)) {
+      // scrollWidth also counts absolutely positioned children and pseudo-elements (.hit-target's
+      // ::after, a NavBadge): measure the in-flow content only.
+      const inner = box.left + control.clientLeft;
+      let right = inner + control.clientWidth;
+      for (const child of control.querySelectorAll('*')) {
+        if (outOfFlowWithin(child, control) || visuallyHidden(child)) continue;
+        right = Math.max(right, child.getBoundingClientRect().right);
+      }
+      const textWalker = document.createTreeWalker(control, NodeFilter.SHOW_TEXT);
+      for (let node = textWalker.nextNode(); node; node = textWalker.nextNode()) {
+        const owner = node.parentElement;
+        if (!node.nodeValue?.trim() || !owner || outOfFlowWithin(owner, control) || visuallyHidden(owner)) continue;
+        range.selectNodeContents(node);
+        right = Math.max(right, range.getBoundingClientRect().right);
+      }
+      if (right > inner + control.clientWidth + 1)
+        add({ check: 'text-overflow', selector: describe(control), text: text(control), detail: `content ${Math.round(right - inner)}px wide in ${control.clientWidth}px` });
+    }
   }
 
   // Numbers broken across lines ("1’234" | "’567", "12." | "11.2026").
@@ -274,7 +314,7 @@ function domChecks(options: DomOptions): Finding[] {
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       const value = node.nodeValue ?? '';
       const owner = node.parentElement;
-      if (!/\d/.test(value) || !owner || ignored(owner) || !visible(owner) || owner.closest('textarea, pre, code')) continue;
+      if (!/\d/.test(value) || !owner || ignored(owner) || !visible(owner) || visuallyHidden(owner) || owner.closest('textarea, pre, code')) continue;
       range.selectNodeContents(node);
       if (range.getClientRects().length < 2) continue;
       for (const match of value.matchAll(number)) {
@@ -287,8 +327,27 @@ function domChecks(options: DomOptions): Finding[] {
     }
   }
 
-  // Tap targets, with an invisible ::before/::after that grows the target.
+  // Tap targets, with an invisible ::before/::after that grows the target. The pseudo-element's
+  // box is measured against its containing block: the element itself when positioned (.hit-target),
+  // else the nearest positioned ancestor (a stretched link's ::after with inset: 0 covers the card).
   const targetSelector = 'a[href], button, input:not([type=hidden]), select, textarea, summary, label, [role=button], [role=link], [role=tab], [role=checkbox], [role=radio], [role=switch], [role=menuitem], [role=option], [tabindex]:not([tabindex="-1"])' + (options.controls ? ', ' + options.controls : '');
+  const containingBlock = (el: Element): Element => {
+    for (let a: Element | null = el; a && a !== document.documentElement; a = a.parentElement) {
+      const style = getComputedStyle(a);
+      if (style.position !== 'static' || style.transform !== 'none' || style.translate !== 'none' || style.filter !== 'none' || /paint|layout|strict|content/.test(style.contain)) return a;
+    }
+    return document.documentElement;
+  };
+  const paddingBox = (el: Element) => {
+    const rect = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    return {
+      left: rect.left + parseFloat(style.borderLeftWidth),
+      right: rect.right - parseFloat(style.borderRightWidth),
+      top: rect.top + parseFloat(style.borderTopWidth),
+      bottom: rect.bottom - parseFloat(style.borderBottomWidth),
+    };
+  };
   const hitBox = (el: Element, rect: DOMRect) => {
     let left = rect.left, right = rect.right, top = rect.top, bottom = rect.bottom;
     for (const pseudo of ['::before', '::after']) {
@@ -297,10 +356,11 @@ function domChecks(options: DomOptions): Finding[] {
       const px = (v: string) => (v.endsWith('px') ? parseFloat(v) : NaN);
       const [t, r, b, l] = [px(style.top), px(style.right), px(style.bottom), px(style.left)];
       if ([t, r, b, l].some(Number.isNaN)) continue;
-      left = Math.min(left, rect.left + l);
-      right = Math.max(right, rect.right - r);
-      top = Math.min(top, rect.top + t);
-      bottom = Math.max(bottom, rect.bottom - b);
+      const block = paddingBox(containingBlock(el));
+      left = Math.min(left, block.left + l);
+      right = Math.max(right, block.right - r);
+      top = Math.min(top, block.top + t);
+      bottom = Math.max(bottom, block.bottom - b);
     }
     return { width: right - left, height: bottom - top };
   };
@@ -333,7 +393,7 @@ function domChecks(options: DomOptions): Finding[] {
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       const owner = node.parentElement;
-      if (!node.nodeValue?.trim() || !owner || ignored(owner) || !visible(owner) || owner.closest('script, style, noscript, template')) continue;
+      if (!node.nodeValue?.trim() || !owner || ignored(owner) || !visible(owner) || visuallyHidden(owner) || owner.closest('script, style, noscript, template')) continue;
       const size = parseFloat(getComputedStyle(owner).fontSize);
       if (size < options.minText - 0.01) add({ check: 'small-text', selector: describe(owner), text: text(owner), detail: `font-size ${size}px under ${options.minText}px` });
     }
