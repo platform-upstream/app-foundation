@@ -7,8 +7,8 @@
 //     FoundationPush.handlePush(event, { fallbackTitle: 'Acme', icon: '/pwa/icon-192.png' }));
 //   self.addEventListener('notificationclick', (event) => FoundationPush.handleClick(event));
 //
-// The payload is the app's own JSON: {title, body, url, tag, badge} (also `id` as the tag, the
-// shape Console and Paper send) or a Declarative Web Push message
+// The payload is the app's own JSON: {title, body, url, tag, badge} (an `id` counts as the tag
+// when there is none) or a Declarative Web Push message
 // ({"web_push": 8030, "notification": {title, body, navigate, tag, app_badge}}). Every push shows
 // a notification (iOS drops the subscription of a worker that stays silent); a missing or broken
 // payload shows the fallback title. What a push says and counts stays the app's.

@@ -1,3 +1,38 @@
+# Migrating to v1.13.0
+
+Compatible for the code; the registry gains files, so the pin bump fails `check` for `api`,
+`profile` and `pwa-shell` until `go tool frontend-registry sync -target . -modules <yours>` is run
+and its diff reviewed (new files `src/foundation/online.ts`, `public/profile-theme.js`,
+`src/foundation/NavBadge.tsx`; `shell.css` gains the nav badge rules, nothing else in it changes).
+Nothing behaves differently until the app uses them (`docs/frontend-registry.md`):
+
+- New modules `push`, `palette`, `scroll-edges`: `go tool frontend-registry install -target .
+  -modules push` (and so on), then add them to the Dockerfile's `check`. Each replaces an app's own
+  copy: delete it and import from `src/foundation/`.
+  - `push`: the app's `public/sw-app.js` drops its `push` and `notificationclick` listeners for
+    `importScripts('sw-push.js')` and `FoundationPush.handlePush(event, { fallbackTitle, icon })` /
+    `FoundationPush.handleClick(event)`. Payloads keep their shape (`id` still works as the tag;
+    add `tag` and `badge` where useful). A worker that called `navigate()` before `focus()` or
+    opened any URL it was sent is fixed by the switch. The settings switch uses `usePush()` over
+    the existing `/api/push/{key,subscribe,unsubscribe}` routes, `setAppBadge(n)` replaces the
+    app's own badge call.
+  - `palette`: `rank`, `normalize`, `readRecents(key)`/`pushRecent(key, id)` (the key is the
+    app's existing localStorage key, so recents survive), `isTypingTarget` and
+    `createShortcutHandler({ keys, go, primary })` replace the app's ranking, folding and shortcut
+    guard. Shortcuts with Alt held (AltGr) and during IME composition no longer fire.
+  - `scroll-edges`: `useScrollEdges(ref)` plus `className="edge-fade"` replace an app's own edge
+    detection and mask rules; set `--edge-fade-start`/`--edge-fade-end` for other fade lengths.
+- `api`: `useOnline()` and `isOfflineError(err)` from `src/foundation/online.ts` replace the app's
+  own online/offline wiring.
+- `profile`: an app with `themes` replaces its own theme bootstrap with
+  `<script src="/profile-theme.js"></script>` in `<head>` before the stylesheets (an older storage
+  key: `data-legacy-key="acme-theme"` on the tag) and moves its theme colours onto the meta:
+  `<meta name="theme-color" content="#ffffff" data-light="#ffffff" data-dark="#16181d">`, before
+  the script. A light-only app does not load it.
+- `pwa-shell`: a nav count becomes `<span className="nav-badge-anchor"><Icon />
+  <NavBadge count={n} label={…} /></span>`; the app keeps the badge's background, colour, radius
+  and ring on `.nav-badge` (and `[data-tone]`), and drops its own positioning rules.
+
 # Migrating to v1.10.0
 
 Compatible; nothing changes without the new configuration. `push` can hand the owner's messages
