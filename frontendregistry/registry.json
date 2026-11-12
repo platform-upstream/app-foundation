@@ -16,6 +16,9 @@
     "template": {
       "description": "Minimal React/Vite application with app-owned content, theme, query policy, top bar and nav on the shared shell.",
       "requires": ["pwa", "pwa-shell"]
+    },
+    "touch": {
+      "description": "Touch ergonomics in @layer foundation: 16px fields and 44px controls on coarse pointers, no tap highlight or double-tap delay, text-size-adjust, .hit-target, opt-in .no-pan-x frame."
     }
   },
   "files": [
@@ -36,6 +39,7 @@
     { "module": "template", "source": "sources/template/main.tsx", "target": "src/main.tsx" },
     { "module": "template", "source": "sources/template/vite-env.d.ts", "target": "src/vite-env.d.ts" },
     { "module": "template", "source": "sources/template/App.tsx", "target": "src/App.tsx" },
-    { "module": "template", "source": "sources/template/app.css", "target": "src/app.css" }
+    { "module": "template", "source": "sources/template/app.css", "target": "src/app.css" },
+    { "module": "touch", "source": "sources/touch/touch.css", "target": "src/foundation/touch.css" }
   ]
 }
