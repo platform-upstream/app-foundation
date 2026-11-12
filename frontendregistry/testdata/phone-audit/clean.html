@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Clean</title>
+<style>
+  html, body { overflow-x: clip; overscroll-behavior-x: none; }
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  .app-shell { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
+  .app-shell-main { flex: 1; overflow-y: auto; overflow-x: clip; overscroll-behavior-x: none; padding: 16px; }
+  button, input, select { font: inherit; min-height: 44px; }
+  .chip { position: relative; display: inline-block; padding: 0 8px; font-size: 14px; line-height: 20px; border: 1px solid #555; border-radius: 10px; background: none; min-height: 0; min-width: 44px; }
+  .chip::after { content: ''; position: absolute; inset: min(0px, calc((100% - 44px) / 2)); }
+  .scroller { display: flex; gap: 8px; overflow-x: auto; }
+  .scroller span { flex: 0 0 200px; }
+  .long { text-overflow: ellipsis; overflow: hidden; white-space: nowrap; display: block; width: 120px; }
+  label.check { display: flex; align-items: center; min-height: 44px; gap: 8px; }
+  nav { display: flex; }
+  nav a { flex: 1; display: grid; place-items: center; min-height: 48px; color: #111; }
+  @media (prefers-reduced-motion: no-preference) { .rise { animation: rise 200ms backwards; } }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <main class="app-shell-main">
+    <h1 class="rise">Übersicht</h1>
+    <p>Kontostand 1’234’567.80 CHF am 12.11.2026. Mehr im <a href="#hilfe">Hilfeartikel</a> dazu.</p>
+    <button type="button">Speichern</button>
+    <button type="button" class="chip">Neu</button>
+    <button type="button"><span class="long">Ein sehr langer Titel, der abgeschnitten wird</span></button>
+    <label class="check"><input type="checkbox"> Erinnern</label>
+    <label for="name">Name</label>
+    <input id="name" type="text">
+    <div class="scroller"><span>Eins</span><span>Zwei</span><span>Drei</span></div>
+  </main>
+  <nav aria-label="Hauptnavigation"><a href="#a">Start</a><a href="#b">Suche</a></nav>
+</div>
+</body>
+</html>

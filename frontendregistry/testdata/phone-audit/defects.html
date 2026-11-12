@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Defects</title>
+<style>
+  body { margin: 0; padding: 16px; font: 16px/1.5 system-ui, sans-serif; }
+  button, input { font: inherit; min-height: 44px; }
+  #wide { width: 600px; height: 40px; background: #eee; }
+  #cramped { width: 60px; white-space: nowrap; }
+  #split { width: 40px; word-break: break-all; }
+  #tiny { width: 24px; height: 24px; min-height: 0; padding: 0; }
+  #small-input { font-size: 13px; }
+  #fine-print { font-size: 11px; }
+  .glass { backdrop-filter: blur(8px); height: 50px; }
+  .spin { width: 20px; height: 20px; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(1turn); } }
+</style>
+</head>
+<body>
+  <input id="search" type="search" aria-label="Suche" autofocus>
+  <div id="content">
+    <div id="wide">Zu breit</div>
+    <button id="cramped" type="button">Rechnungen</button>
+    <p id="split">1234567890123</p>
+    <button id="tiny" type="button" aria-label="Schliessen">x</button>
+    <input id="small-input" type="text" aria-label="Betrag">
+    <p id="fine-print">Kleingedrucktes</p>
+    <div class="glass">Glas</div>
+    <div class="spin" role="img" aria-label="lädt"></div>
+    <p style="height: 900px">Lange Seite</p>
+  </div>
+</body>
+</html>

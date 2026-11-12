@@ -1,0 +1,40 @@
+/* Reduced-motion policy (app-foundation registry module `motion`). Registry-owned: do not edit in
+   an application; `frontend-registry check` fails on any change. There are no motion tokens here:
+   durations, easings, keyframes and how far things travel are the application's look.
+
+   The policy, for the application's own CSS:
+
+   1. Movement is opt-in. Every animation and every transition of transform, translate, scale,
+      rotate, position or size sits under `@media (prefers-reduced-motion: no-preference)`. With
+      "reduce motion" on, nothing moves and nothing is missing: the end state is the default state.
+      Colour and opacity changes may stay outside, they are not motion.
+   2. Never a global kill switch (`* { animation: none !important; transition: none !important }`
+      or `.01ms` durations). It also stops spinners and progress that carry state, and it does not
+      compose with cascade layers: an `!important` declaration in an earlier layer beats every
+      later layer's `!important` and every unlayered one. A kill switch imported into a low layer
+      silently wins over the application's own reduced-motion fade in a later layer; one in a high
+      layer cannot be overridden where motion is needed.
+   3. Entrances use fill-mode `backwards`, never `both` or `forwards`: a filled animation keeps its
+      element a stacking context and a containing block after it ends (a row's menu opens under the
+      next row, a fixed child scrolls away). See useEntrance in motion.ts.
+   4. A transition the script decides to skip (the first placement of a sliding indicator) is
+      written as `.indicator:not([data-instant]) { transition: ... }` inside the no-preference
+      block. A layered `[data-instant] { transition: none }` here could not beat the application's
+      unlayered transition.
+   5. `view-transition-name` never sits on the scrolling page frame (`.app-shell-main`, the page
+      column): a named element is a stacking context while it has the name, and fixed overlays
+      inside it (sheets, toasts, menus) land under the top bar and the nav. Name the content inside
+      the frame, or nothing, and let the root cross-fade. See viewTransition in motion.ts.
+
+   Import this file before the application's own CSS. */
+@layer foundation {
+  /* A view transition started by CSS (cross-document) or by an application that does not use
+     viewTransition() still jumps straight to the new page under "reduce motion". */
+  @media (prefers-reduced-motion: reduce) {
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) {
+      animation: none;
+    }
+  }
+}

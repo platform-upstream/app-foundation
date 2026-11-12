@@ -27,6 +27,9 @@ radii, shadows or fonts; their Node tests (`frontendregistry/testdata/*_test.mjs
 UI mechanics `sheet`, `toast`, `pull-refresh` (handbook ADR 0005): behaviour only, cores without React, CSS in
 `@layer foundation` with no look values (a test checks); TS logic tests need Node 22.18+, the browser run is
 `frontendregistry/testdata/mechanics_e2e.mjs`.
+UI mechanics modules (`touch`, `motion`, `phone-audit`) carry behaviour only, never look values (colours, radii,
+shadows, fonts, durations, nav look); CSS in `@layer foundation`, no `!important`. Their TS/JS tests run on Node with
+type stripping; `PHONE_AUDIT_PLAYWRIGHT=<path to the playwright package>` (and `CHROME`) runs the phone audit.
 
 Change: tests for changed behaviour; in WSL `go vet ./... && go test -race ./...` (Node runs the sw.js test);
 commit to `main` without attribution; CI green (go, minimum-go, scaffold). Release: SemVer (breaking = new

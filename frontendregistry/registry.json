@@ -34,6 +34,15 @@
     },
     "scroll-edges": {
       "description": "useScrollEdges marks a sideways scroller with data-more-start/end; .edge-fade fades those edges with a mask only (no colour)."
+    },
+    "touch": {
+      "description": "Touch ergonomics in @layer foundation: 16px fields and 44px controls on coarse pointers, no tap highlight or double-tap delay, text-size-adjust, .hit-target, opt-in .no-pan-x frame."
+    },
+    "motion": {
+      "description": "Reduced-motion policy (no tokens) plus prefersReducedMotion, useReducedMotion, useEntrance (first insert only), viewTransition with fallback, useSlidingIndicator."
+    },
+    "phone-audit": {
+      "description": "Playwright phone audit at 375x667 and 390x844 (touch): sideways pan, text and number overflow, 44px targets, 16px fields, 14px text, axe, autofocus, refetch layout shift, reduced motion, platform rules."
     }
   },
   "files": [
@@ -71,6 +80,11 @@
     { "module": "palette", "source": "sources/palette/palette.ts", "target": "src/foundation/palette.ts" },
     { "module": "palette", "source": "sources/palette/shortcuts.ts", "target": "src/foundation/shortcuts.ts" },
     { "module": "scroll-edges", "source": "sources/scroll-edges/scroll-edges.ts", "target": "src/foundation/scroll-edges.ts" },
-    { "module": "scroll-edges", "source": "sources/scroll-edges/scroll-edges.css", "target": "src/foundation/scroll-edges.css" }
+    { "module": "scroll-edges", "source": "sources/scroll-edges/scroll-edges.css", "target": "src/foundation/scroll-edges.css" },
+    { "module": "touch", "source": "sources/touch/touch.css", "target": "src/foundation/touch.css" },
+    { "module": "motion", "source": "sources/motion/motion.css", "target": "src/foundation/motion.css" },
+    { "module": "motion", "source": "sources/motion/motion.ts", "target": "src/foundation/motion.ts" },
+    { "module": "phone-audit", "source": "sources/phone-audit/phone-audit.ts", "target": "e2e/foundation/phone-audit.ts" },
+    { "module": "phone-audit", "source": "sources/phone-audit/phone-audit-tests.ts", "target": "e2e/foundation/phone-audit-tests.ts" }
   ]
 }

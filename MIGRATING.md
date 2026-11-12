@@ -48,6 +48,31 @@ Nothing behaves differently until the app uses them (`docs/frontend-registry.md`
     `--shell-nav-height`.
   - `pull-refresh`: `usePullToRefresh(mainRef, refresh)` on `AppShell`'s `mainProps.ref` and the
     app's indicator from `{ pull, ready, busy }`; delete the app's own touch handling.
+- New modules `touch`, `motion`, `phone-audit` (details in `docs/frontend-registry.md`):
+
+  - `touch`: `go tool frontend-registry install -target . -modules touch`, then
+    `import './foundation/touch.css'` after `shell.css`, before the app's CSS. Put `no-pan-x` on
+    `html`, `body` and `AppShell`'s `mainProps.className`. Delete the app's own copy of the same
+    rules (tap highlight, 16px fields, 44px floors, `text-size-adjust`, `overflow-x: clip` on the
+    frame); keep its own larger sizes and press feedback. Remove `autoFocus` from fields on touch.
+  - `motion`: install, `import './foundation/motion.css'` next to `touch.css`, and replace the app's
+    `reduced()`/`prefersReducedMotion`, entrance hook, `viewTransition` and indicator hook with the
+    ones from `./foundation/motion.js`. Move every animation and moving transition under
+    `@media (prefers-reduced-motion: no-preference)` and delete a global reduced-motion kill switch
+    (`* { animation: none !important }`, `.01ms`). Changed shapes: `useEntrance(ref, ready)` returns
+    a boolean for `data-entering` instead of a class name; `useSlidingIndicator` returns
+    `{ style, instant }` (Console's `box` + `indicatorStyle`, Finance's `useIndicator` with
+    `data-ind` become a selector such as `[aria-current="page"]` and a key); `viewTransition` no
+    longer carries a hero element (Paper keeps its own `doc-hero` naming around it).
+  - `phone-audit`: install, `pnpm add -D @playwright/test @axe-core/playwright`, a Playwright config
+    with the app's `baseURL` and server, and `e2e/phone.spec.ts` calling `phoneAudit({ routes, setup })`
+    (example in the docs). Add `phone-audit` to the `check` list like the other modules. Paper's
+    `e2e/phone-audit/overflow.mjs` and `pan.mjs` are covered by it, except the sibling-overlap,
+    labels-touch, word-split and badge checks, which stay Paper's.
+
+  Verified in a scratch app: `install -modules template,touch,motion,phone-audit`, frozen install,
+  `tsc`, `vite build`, the audit at 390x844 clean on the template page (after app-owned 44px nav
+  links and `no-pan-x`) and failing a planted 28px button with its selector.
 
 # Migrating to v1.10.0
 
