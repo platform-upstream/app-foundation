@@ -24,7 +24,7 @@ changes registry files fails it until `sync` is run and its diff reviewed.
 `install` writes missing files but refuses to replace a changed target. `check` exits non-zero and
 lists missing or changed registry-owned files. `sync` is the explicit replacement operation; review
 its diff because it overwrites selected registry-owned source. Selecting `template` automatically
-includes its `pwa` dependency. With no module list, every module is selected.
+includes its dependencies `pwa`, `pwa-shell`, `touch` and `motion`. With no module list, every module is selected.
 All reads and writes are anchored to the requested real directory, reject symlink parents, and use
 root-confined atomic replacement, so a consumer-tree symlink cannot redirect output elsewhere.
 
@@ -148,6 +148,11 @@ are a starting point, not a shared theme.
 - `template` supplies only a clean React/Vite entry point, visible application-owned QueryClient
   policy, accessible document defaults, root-origin build configuration, PWA registration, and a
   minimal `AppShell` with a top bar and nav that tells adopters to create an application identity.
+  It requires `touch` and `motion` and passes `phone-audit` as installed: `main.tsx` imports
+  `shell.css`, `touch.css`, `motion.css`, then `app.css`; `no-pan-x` sits on `html`, `body` and
+  `mainProps.className`; nav items are 44px targets. Its `package.json` carries `@playwright/test`
+  and `@axe-core/playwright` (in the frozen lockfile) and a `test:phone` script, so installing
+  `phone-audit` only needs a Playwright config and `e2e/phone.spec.ts` (`app-scaffold` writes both).
 - `api` also installs `online.ts`: `useOnline()` (`navigator.onLine` and its events through
   `useSyncExternalStore`) and `isOfflineError(err)`, true for a request that never reached a
   server (offline, or the fetch `TypeError` of Chromium, Firefox and Safari) and false for any
