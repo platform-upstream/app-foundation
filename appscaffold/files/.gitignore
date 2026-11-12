@@ -5,3 +5,5 @@ web/dist/
 *.sqlite*
 *.db
 .env*
+web/test-results/
+web/playwright-report/

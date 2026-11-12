@@ -50,7 +50,14 @@ owner `local`.
 
 ## Known traps (from Color, Omni, Workbench)
 
-- iOS zooms into inputs under 16px and stays zoomed: `app.css` keeps fields at 16px or more.
+- iOS zooms into inputs under 16px and stays zoomed: `foundation/touch.css` keeps fields at 16px
+  and controls at 44px on touch; an app rule that goes smaller wins, and the phone audit reports it.
+- Never autofocus a field on touch: the keyboard opens and the shell hides the nav.
+- `no-pan-x` stays on `html`, `body` and the shell's `<main>`: without it a diagonal flick pans the
+  page or swipes back in history.
+- Every animation and moving transition sits under `@media (prefers-reduced-motion:
+  no-preference)` (`foundation/motion.css` states the policy); overlays use `foundation/useSheet`,
+  messages `toast()` from `foundation/toast`.
 - View Transitions crash WebKit in Playwright's device emulation; animate page changes with CSS.
 - `content-visibility: auto` on long lists shifts restored scroll positions; remember the item id
   and scroll to it instead.
@@ -69,7 +76,10 @@ cd web && pnpm dev                               # Vite on 127.0.0.1:__VITE_PORT
 
 pnpm comes from npm at the version `web/package.json` names (`npm i -g pnpm@<version>`).
 Checks (the Dockerfile runs the same): `go test ./...`, `go vet ./...`, `gofmt -l cmd internal`,
-`cd web && pnpm typecheck && pnpm build`. Under Windows some Go tests fail on file locking; run
+`cd web && pnpm typecheck && pnpm build`. Phone audit, before every UI change is pushed:
+`cd web && pnpm build && pnpm test:phone` (built UI on 127.0.0.1:__PHONE_PORT__, API from the fixtures in
+`e2e/phone.spec.ts`; add each new route there; a browser: `pnpm exec playwright install chromium`
+or `CHROME=<chromium binary>`). Under Windows some Go tests fail on file locking; run
 them in WSL or Docker.
 
 ## Delivery

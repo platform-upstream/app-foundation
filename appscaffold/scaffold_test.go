@@ -62,16 +62,19 @@ func TestGenerateRendersCompleteApp(t *testing.T) {
 		"deploy/values.yaml":                  {"repository: registry.example.org/acme-apps/field-notes", "hostname: field-notes.apps.example.org", `cfTeamDomain: ""`},
 		"deploy/templates/deployment.yaml":    {`required "cfTeamDomain is required`, "path: /readyz", "path: /healthz"},
 		"deploy/Chart.yaml":                   {"name: field-notes"},
-		"Dockerfile":                          {"./cmd/field-notes", "static-debian13:nonroot"},
+		"Dockerfile":                          {"./cmd/field-notes", "static-debian13:nonroot", "-modules api,pwa,pwa-shell,touch,motion,sheet,toast,phone-audit\n"},
 		".ci/pipeline.yaml":                   {"name: field-notes"},
 		"AGENTS.md":                           {"https://field-notes.apps.example.org", "Vite on 127.0.0.1:5250", "cfTeamDomain: acme.cloudflareaccess.com", "caller-field-notes-key"},
 		"CLAUDE.md":                           {"@AGENTS.md"},
 		"web/index.html":                      {`<html lang="de" class="no-pan-x">`, `<title>Field Notes: Familie</title>`, `content="Field Notes: Familie" />`, `href="/pwa/icon-180.png"`},
 		"web/public/pwa/manifest.webmanifest": {`"name": "Field Notes: Familie"`, `"lang": "de"`},
-		"web/package.json":                    {`"name": "field-notes-web"`},
-		"web/src/main.tsx":                    {`registerServiceWorker({ name: 'field-notes' });`},
+		"web/src/main.tsx":                    {`registerServiceWorker({ name: 'field-notes' });`, "import './foundation/motion.css';\nimport './foundation/sheet.css';\nimport './foundation/toast.css';\nimport './app.css';"},
+		"web/package.json":                    {`"name": "field-notes-web"`, `"test:phone": "playwright test"`, `"@playwright/test"`, `"@axe-core/playwright"`},
+		"web/playwright.config.ts":            {"const port = 5350;", "vite preview"},
+		"web/e2e/phone.spec.ts":               {"from './foundation/phone-audit-tests.ts'", "phoneAudit({"},
+		"web/e2e/foundation/phone-audit.ts":   {"export async function auditPage"},
+		"web/src/App.tsx":                     {"NotesPage", "<ToastRegion", "className: 'no-pan-x'"},
 		"web/vite.config.ts":                  {"port: 5250", "'http://127.0.0.1:8150'"},
-		"web/src/App.tsx":                     {"NotesPage"},
 		"web/public/pwa/icon.svg":             {`fill="#2f6fde"`},
 	} {
 		got := read(t, target, name)
@@ -121,7 +124,7 @@ func TestGenerateRendersCompleteApp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	differences, err := registry.Check(filepath.Join(target, "web"), "api", "pwa", "pwa-shell")
+	differences, err := registry.Check(filepath.Join(target, "web"), checkedModules...)
 	if err != nil || len(differences) != 0 {
 		t.Fatalf("registry check: %v %v", differences, err)
 	}

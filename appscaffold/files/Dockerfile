@@ -22,7 +22,7 @@ COPY migrations/ ./migrations/
 COPY web/ ./web/
 COPY --from=frontend /src/web/dist ./web/dist
 # Registry-owned frontend files must match the pinned app-foundation (sync after a bump).
-RUN go tool frontend-registry check -target web -modules api,pwa,pwa-shell
+RUN go tool frontend-registry check -target web -modules __CHECKED_MODULES__
 ARG CACHE_SCOPE=local
 RUN --mount=type=cache,id=gobuild-${CACHE_SCOPE},target=/root/.cache/go-build \
     test -z "$(gofmt -l cmd internal migrations web)" && \

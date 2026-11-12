@@ -36,8 +36,14 @@ var (
 	placeholder     = regexp.MustCompile(`__[A-Z][A-Z_]*__`)
 )
 
-// frontendModules are installed into web/ from the frontend registry.
-var frontendModules = []string{"template", "api"}
+// frontendModules are installed into web/ from the frontend registry: the template (which brings
+// pwa, pwa-shell, touch and motion), the API client, sheet and toast, and the phone audit that
+// e2e/phone.spec.ts runs. The Dockerfile checks the same list.
+var frontendModules = []string{"template", "api", "touch", "motion", "sheet", "toast", "phone-audit"}
+
+// checkedModules is the module list of the generated Dockerfile's `frontend-registry check`: every
+// installed module that owns checked files (template's files belong to the app).
+var checkedModules = []string{"api", "pwa", "pwa-shell", "touch", "motion", "sheet", "toast", "phone-audit"}
 
 // Platform describes the installation an app is generated for. Each platform keeps one profile
 // (platform.json in its config repository); no platform's names live in this module.
@@ -92,8 +98,8 @@ type Options struct {
 	Color string
 	// Lang is the document and manifest language (two letters). Default: en.
 	Lang string
-	// Port is the local preview port of the Go server; Vite runs on Port-2900. Default: a port in
-	// 8200-8299 derived from the name.
+	// Port is the local preview port of the Go server; Vite runs on Port-2900 and the phone audit's
+	// preview on Port-2800. Default: a port in 8200-8299 derived from the name.
 	Port int
 }
 
@@ -161,6 +167,8 @@ func (o Options) replacer() *strings.Replacer {
 		"__APP_HOST__", o.Hostname,
 		"__APP_PORT__", strconv.Itoa(o.Port),
 		"__VITE_PORT__", strconv.Itoa(o.Port-2900),
+		"__PHONE_PORT__", strconv.Itoa(o.Port-2800),
+		"__CHECKED_MODULES__", strings.Join(checkedModules, ","),
 		"__MODULE__", o.Module,
 		"__IMAGE_REPOSITORY__", o.ImageRepository,
 		"__FOUNDATION_VERSION__", o.FoundationVersion,
@@ -305,6 +313,7 @@ func personalize(tree *sourcetree.Tree, o Options) error {
 		// The service worker stays the template's copy; the registration names its cache.
 		"web/src/main.tsx": {
 			{`registerServiceWorker();`, `registerServiceWorker({ name: '` + o.Name + `' });`},
+			{"import './foundation/motion.css';\n", "import './foundation/motion.css';\nimport './foundation/sheet.css';\nimport './foundation/toast.css';\n"},
 		},
 		"web/vite.config.ts": {
 			{"  build: { outDir: 'dist', emptyOutDir: true },\n", "  build: { outDir: 'dist', emptyOutDir: true },\n" +
