@@ -35,6 +35,11 @@ func read(t *testing.T, target, name string) string {
 func TestGenerateRendersCompleteApp(t *testing.T) {
 	target := generate(t, Options{Name: "field-notes", FoundationVersion: "v1.0.0", Platform: testPlatform, Title: "Field Notes: Familie", Lang: "de", Color: "#2F6FDE", Port: 8150})
 
+	// Renovate runs the sync script directly: it must be executable.
+	if info, err := os.Stat(filepath.Join(target, "scripts/foundation-sync.sh")); err != nil || info.Mode().Perm()&0o111 == 0 {
+		t.Errorf("scripts/foundation-sync.sh not executable: %v %v", info, err)
+	}
+
 	// No placeholder survives anywhere, in the scaffold's files or the registry's.
 	err := filepath.WalkDir(target, func(name string, entry fs.DirEntry, err error) error {
 		if err != nil || entry.IsDir() || strings.HasSuffix(name, ".png") {
@@ -66,6 +71,8 @@ func TestGenerateRendersCompleteApp(t *testing.T) {
 		".ci/pipeline.yaml":                   {"name: field-notes"},
 		"AGENTS.md":                           {"https://field-notes.apps.example.org", "Vite on 127.0.0.1:5250", "cfTeamDomain: acme.cloudflareaccess.com", "caller-field-notes-key"},
 		"CLAUDE.md":                           {"@AGENTS.md"},
+		"renovate.json":                       {`"local>platform-upstream/workflows"`, `"scripts/foundation-sync.sh"`},
+		"scripts/foundation-sync.sh":          {"frontend-registry check -target", "go tool"},
 		"web/index.html":                      {`<html lang="de" class="no-pan-x">`, `<title>Field Notes: Familie</title>`, `content="Field Notes: Familie" />`, `href="/pwa/icon-180.png"`},
 		"web/public/pwa/manifest.webmanifest": {`"name": "Field Notes: Familie"`, `"lang": "de"`},
 		"web/src/main.tsx":                    {`registerServiceWorker({ name: 'field-notes' });`, "import './foundation/motion.css';\nimport './foundation/sheet.css';\nimport './foundation/toast.css';\nimport './app.css';"},

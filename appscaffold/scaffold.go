@@ -289,6 +289,12 @@ func Generate(target string, options Options) error {
 		if err := tree.AtomicWrite(item.name, item.data); err != nil {
 			return fmt.Errorf("write app scaffold target %q: %w", item.name, err)
 		}
+		// scripts/ are run directly (Renovate's postUpgradeTasks run scripts/foundation-sync.sh).
+		if strings.HasPrefix(item.name, "scripts/") {
+			if err := os.Chmod(filepath.Join(target, item.name), 0o755); err != nil {
+				return fmt.Errorf("make app scaffold script %q executable: %w", item.name, err)
+			}
+		}
 	}
 	return nil
 }

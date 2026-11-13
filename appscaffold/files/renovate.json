@@ -1,0 +1,15 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["local>platform-upstream/workflows"],
+  "packageRules": [
+    {
+      "description": "An app-foundation update also syncs the registry-owned frontend files (scripts/foundation-sync.sh); without it the Dockerfile's frontend-registry check fails and the PR stays red.",
+      "matchPackageNames": ["github.com/platform-upstream/app-foundation"],
+      "postUpgradeTasks": {
+        "commands": ["scripts/foundation-sync.sh"],
+        "executionMode": "branch",
+        "installTools": { "golang": {} }
+      }
+    }
+  ]
+}
