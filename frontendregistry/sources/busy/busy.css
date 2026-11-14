@@ -1,0 +1,95 @@
+/* Busy cues (app-foundation registry module `busy`). Registry-owned: do not edit in an
+   application. Mechanics only, in @layer foundation so the app's rules win. The look is the app's,
+   through its own class on the element and these custom properties (none has a look default):
+     .busy-bar     place, height, `color` (the moving segment is currentColor), radius;
+                   --busy-bar-duration (one sweep; without it the segment stands still),
+                   --busy-bar-easing, --busy-bar-segment (30%), --busy-bar-opacity (1),
+                   --busy-fade (fade in and out; without it the bar appears at once).
+     .busy-scope   --busy-pending-opacity, --busy-pending-filter (e.g. blur(1.5px)) for its
+                   [data-result] descendants; --busy-fade as above.
+   Import after shell.css, before the app's CSS. */
+@layer foundation {
+  /* position: relative holds the track; an app rule placing the bar (absolute, fixed) wins. */
+  .busy-bar {
+    display: block;
+    position: relative;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .busy-bar[data-busy] {
+    opacity: var(--busy-bar-opacity, 1);
+  }
+
+  .busy-bar-track,
+  .busy-bar-track > i {
+    position: absolute;
+    inset: 0;
+  }
+
+  /* The segment: the track slides from fully left of the bar to fully right of it, so the segment
+     crosses at any width with a transform only. Without --busy-bar-duration it stands at the
+     start of the bar. */
+  .busy-bar-track > i::before {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    width: var(--busy-bar-segment, 30%);
+    background: currentColor;
+  }
+
+  /* Visually hidden, still read: the live region beside the bar. */
+  .busy-status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .busy-scope[data-pending] [data-result] {
+    opacity: var(--busy-pending-opacity, 1);
+    filter: var(--busy-pending-filter, none);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .busy-bar {
+      transition: opacity var(--busy-fade);
+    }
+
+    .busy-bar-track > i {
+      animation: foundation-busy-bar var(--busy-bar-duration) var(--busy-bar-easing, ease-in-out) infinite;
+      animation-play-state: paused;
+    }
+
+    .busy-bar[data-busy] .busy-bar-track > i {
+      animation-play-state: running;
+    }
+
+    .busy-scope [data-result] {
+      transition: opacity var(--busy-fade), filter var(--busy-fade);
+    }
+  }
+
+  /* Reduced motion: a still, full-width bar while busy; nothing moves or fades. */
+  @media (prefers-reduced-motion: reduce) {
+    .busy-bar-track > i::before {
+      width: 100%;
+    }
+  }
+
+  @keyframes foundation-busy-bar {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(100%);
+    }
+  }
+}

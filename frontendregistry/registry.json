@@ -41,6 +41,9 @@
     "motion": {
       "description": "Reduced-motion policy (no tokens) plus prefersReducedMotion, useReducedMotion, useEntrance (first insert only), viewTransition with fallback, useSlidingIndicator."
     },
+    "busy": {
+      "description": "Busy cues without a look: a gate (delay before showing, minimum visible time), useDelayedBusy, an always-mounted indeterminate BusyBar with a live region, and PendingScope that dims and blurs [data-result] by the app's custom properties while results recompute."
+    },
     "phone-audit": {
       "description": "Playwright phone audit at 375x667 and 390x844 (touch): sideways pan, text and number overflow, 44px targets, 16px fields, 14px text, axe, autofocus, refetch layout shift, reduced motion, platform rules."
     }
@@ -84,6 +87,9 @@
     { "module": "touch", "source": "sources/touch/touch.css", "target": "src/foundation/touch.css" },
     { "module": "motion", "source": "sources/motion/motion.css", "target": "src/foundation/motion.css" },
     { "module": "motion", "source": "sources/motion/motion.ts", "target": "src/foundation/motion.ts" },
+    { "module": "busy", "source": "sources/busy/busy.ts", "target": "src/foundation/busy.ts" },
+    { "module": "busy", "source": "sources/busy/Busy.tsx", "target": "src/foundation/Busy.tsx" },
+    { "module": "busy", "source": "sources/busy/busy.css", "target": "src/foundation/busy.css" },
     { "module": "phone-audit", "source": "sources/phone-audit/phone-audit.ts", "target": "e2e/foundation/phone-audit.ts" },
     { "module": "phone-audit", "source": "sources/phone-audit/phone-audit-tests.ts", "target": "e2e/foundation/phone-audit-tests.ts" }
   ]

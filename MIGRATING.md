@@ -1,3 +1,18 @@
+# Migrating to v1.16.0
+
+Compatible; no registry file changes for installed modules, so `check` stays green after the pin
+bump. New module `busy` (`docs/frontend-registry.md`): busy cues without a look.
+
+- `go tool frontend-registry install -target <web dir> -modules busy`, add `busy` to the
+  Dockerfile's `check` list, import `./foundation/busy.css` after `shell.css` and before the app's
+  CSS.
+- An app's own delayed-busy hook, top-bar fetch line or recompute blur (Console's `FetchLine`,
+  Finance's `Pending`) becomes `useDelayedBusy`, `<BusyBar>` and `<PendingScope>`. The look moves
+  into the app's CSS as values of `--busy-bar-duration`, `--busy-bar-opacity`, `--busy-fade`,
+  `--busy-pending-opacity`, `--busy-pending-filter` and the bar's own class (place, height,
+  `color`). Mark result elements `data-result`; cards dimmed by class keep an app rule over the
+  same properties.
+
 # Migrating to v1.15.0
 
 Compatible for the code. Registry files changed in `phone-audit`, `touch`, `palette`, `sheet`,

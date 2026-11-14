@@ -262,10 +262,10 @@ The `template` module's `index.html` and `public/pwa/manifest.webmanifest` point
 `/pwa/icon.svg` and `/pwa/icon-{180,192,512}.png`; the registry ships no icons. `app-scaffold` draws
 a starting set; an app that installs `template` on its own adds these four files itself.
 
-## Sheets, toasts and pull to refresh
+## Sheets, toasts, pull to refresh and busy cues
 
 Look-neutral UI mechanics (handbook ADR 0005): behaviour, accessibility and iOS quirks, never a
-look value. Each module has a core without React (`sheet.ts`, `toast.ts`, `pull.ts`) and a thin
+look value. Each module has a core without React (`sheet.ts`, `toast.ts`, `pull.ts`, `busy.ts`) and a thin
 React layer; CSS sits in `@layer foundation`, imported after `shell.css` and before the app's CSS,
 so the app's rules win. Their logic runs under `go test` (Node with type stripping, 22.18+);
 `frontendregistry/testdata/mechanics_e2e.mjs` drives an installed fixture in Chromium at 390×844
@@ -381,3 +381,58 @@ const { pull, ready, busy } = usePullToRefresh(main, () => queryClient.refetchQu
 - Passive listeners: nothing is cancelled and the page itself never moves, so the scroller's own
   bounce stays as it is. The indicator, its position and its motion are the app's.
 - Apps without React: `attachPullToRefresh(scroller, refresh, onState, options) → detach`.
+
+### `busy`
+
+Cues for work in progress that keep the page as it is: a thin bar while data refetches and a
+blur over results while they recompute. A gate decides when they show; the look, the timings and
+the words are the app's.
+
+```tsx
+import { BusyBar, PendingScope, useDelayedBusy } from './foundation/Busy.js';
+import './foundation/busy.css';
+
+<header className="topbar">
+  …
+  <BusyBar busy={useIsFetching() > 0} delay={350} minVisible={400} className="topbar-busy" status={refreshing ? 'Updating' : undefined} />
+</header>
+
+<PendingScope busy={query.isFetching} delay={150} minVisible={0}>
+  {(on) => <>
+    <section className="card" data-controls>…sliders…</section>
+    <section className="card" data-result>…figures…</section>
+    {on && <div className="pending-pill">Calculating</div>}
+  </>}
+</PendingScope>
+```
+
+```css
+.topbar-busy { position: absolute; inset: auto 0 -1px; height: 2px; color: var(--accent);
+  --busy-bar-duration: 1.2s; --busy-bar-opacity: 0.8; --busy-fade: 0.25s; }
+.busy-scope { --busy-pending-opacity: 0.5; --busy-pending-filter: blur(1.5px); --busy-fade: 0.2s; }
+```
+
+- `busyGate({ delay, minVisible }, onChange, clock?)` (`busy.ts`, no React) turns a busy flag into
+  shown or hidden: shown after `delay` ms of busy, so a fast answer never blinks; busy ending
+  before that shows nothing. Once shown it stays at least `minVisible` ms; busy again meanwhile
+  keeps it without a new delay. `useDelayedBusy(busy, { delay, minVisible })` is the hook. Both
+  take a plain boolean (`useIsFetching() > 0`, `query.isFetching`, `mutation.isPending`); there is
+  no query wrapper.
+- `<BusyBar busy delay minVisible className? status?>`: always mounted, `data-busy` while shown,
+  so it never shifts the layout; the bar works at every width (one transform moves the segment
+  across, `--busy-bar-segment` wide, 30% by default) and is `aria-hidden`. Beside it a visually
+  hidden `role="status"` region, also always mounted, says `status` while the bar shows: give it
+  for a wait the person started (a manual refresh), leave it out for background polls.
+- `<PendingScope busy delay minVisible className?>` sets `data-pending` and `aria-busy` on its
+  wrapper (`.busy-scope`); descendants marked `data-result` take `--busy-pending-opacity` and
+  `--busy-pending-filter`. Everything else stays sharp and usable, the controls that caused the
+  recompute above all. `children` may be a function of `on` to render the app's own label. To dim
+  more than `[data-result]`, an app rule uses the same properties, e.g.
+  `.busy-scope[data-pending] .card:not([data-controls]) { opacity: var(--busy-pending-opacity);
+  filter: var(--busy-pending-filter); }`.
+- `busy.css` has no look default: the bar's place, height, radius and colour (the segment is
+  `currentColor`) come from the app's class; `--busy-bar-duration` (required for the sweep),
+  `--busy-bar-easing` (ease-in-out), `--busy-bar-opacity` (1), `--busy-fade` (fade in and out, none
+  without it), `--busy-pending-opacity` (1) and `--busy-pending-filter` (none). Sweep and fades
+  run only under `prefers-reduced-motion: no-preference`; under `reduce` the bar is still and full
+  width while busy.
