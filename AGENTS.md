@@ -34,5 +34,5 @@ type stripping; `PHONE_AUDIT_PLAYWRIGHT=<path to the playwright package>` (and `
 Change: tests for changed behaviour; in WSL `go vet ./... && go test -race ./...` (Node runs the sw.js test);
 commit to `main` without attribution; CI green (go, minimum-go, scaffold). Release: SemVer (breaking = new
 major agreed by both platform owners), MIGRATING.md entry, and a `Release: none|patch|minor|major` commit
-trailer; after green CI `release.yml` tags the next version (docs-only releases nothing, a major becomes a
+trailer; after green CI the platform CI's release step tags the next version (docs-only releases nothing, a major becomes a
 draft). Never tag by hand. The repo is private: never put a GitHub credential in a build or config.
