@@ -88,8 +88,9 @@ func newPeople(mode access.Mode) (people, error) {
 	return people{resolver: identity.NewCache(client, identity.CacheOptions{})}, nil
 }
 
-// newHandler composes the routes in the foundation's order: security headers, the public shallow
-// /healthz (liveness) and /readyz (readiness: the database answers), the public /pwa/ files
+// newHandler composes the routes in the foundation's order: security headers, the public probes
+// (server.Probes: shallow /healthz for liveness, /readyz for readiness: the database answers, and
+// /version with the release), the public /pwa/ files
 // (manifest and icons, see web.PublicPrefix), then Cloudflare Access for everything else, static
 // files included. The API also needs a directory person (identity.Middleware).
 func newHandler(st *store.Store, auth *access.Authenticator, who people, origin string) (http.Handler, error) {
@@ -119,8 +120,7 @@ func newHandler(st *store.Store, auth *access.Authenticator, who people, origin 
 	})(protected)
 
 	mux := http.NewServeMux()
-	mux.Handle("GET /healthz", server.Health())
-	mux.Handle("GET /readyz", server.Ready(st.Ping))
+	server.Probes(mux, st.Ping)
 	mux.Handle("/", web.PublicFiles(spa, gated))
 	return web.Headers(web.HeaderPolicy{CSP: csp})(mux), nil
 }

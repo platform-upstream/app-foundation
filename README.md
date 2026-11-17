@@ -30,6 +30,8 @@ The initial packages are:
 - `memory`: the proven shared Memory service client, including the identical Cook/Watch SQLite
   cache, durable outbox, and conflict behavior.
 - `server`: explicit HTTP server limits, shallow liveness (`Health`), bounded readiness (`Ready`),
+  the release on `/version` (`Version`: `APP_VERSION`/`APP_COMMIT`, else the build information),
+  all three in one call (`Probes`),
   and graceful context-driven shutdown with a bounded deadline.
 - `sqlite`: bounded pure-Go SQLite setup, explicit read-only operation, consistent snapshots, and
   ordered embedded transactional migrations.
@@ -55,7 +57,7 @@ API detail and runnable usage live in the packages: `go doc <package>` shows eac
 
 **Composition.** Applications build their own route tree and choose their own status semantics,
 validation and failure copy. Outermost first: `web.Headers`; optional `httpx.RequestIDs`; the public
-probes `/healthz` and `/readyz`; bearer-authenticated internal routes (`access.Internal`);
+probes `/healthz`, `/readyz` and `/version`; bearer-authenticated internal routes (`access.Internal`);
 `web.PublicFiles(spa, gated)`; Cloudflare/local authentication for everything else, static files
 included, so a signed-out document reaches Access instead of the embedded shell; same-origin checks
 and bounded JSON decoding at the API, with an `httpx.NotFound` `/api/` boundary before the SPA.

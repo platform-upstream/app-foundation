@@ -12,15 +12,15 @@ import (
 	"github.com/platform-upstream/app-foundation/server"
 )
 
-// A main: shallow liveness on /healthz, readiness with a database ping on /readyz, the bounded
-// server, and graceful shutdown on SIGTERM (Kubernetes) or Ctrl-C.
+// A main: the public probes (shallow liveness on /healthz, readiness with a database ping on
+// /readyz, the release on /version), the bounded server, and graceful shutdown on SIGTERM
+// (Kubernetes) or Ctrl-C.
 func Example() {
 	var db *sql.DB // sqlite.Open(...)
 	app := http.NewServeMux()
 
 	mux := http.NewServeMux()
-	mux.Handle("GET /healthz", server.Health())
-	mux.Handle("GET /readyz", server.Ready(db.PingContext))
+	server.Probes(mux, db.PingContext)
 	mux.Handle("/", app)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

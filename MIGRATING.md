@@ -1,3 +1,18 @@
+# Migrating to v1.17.0
+
+Compatible; no registry file changes. New in `server`: `Version()` answers `GET /version` with
+`{"version","commit","foundation","go"}` (from `APP_VERSION` and `APP_COMMIT`, else the binary's
+build information), and `Probes(mux, readyChecks...)` registers `/healthz`, `/readyz` and
+`/version` in one call.
+
+- Replace `mux.Handle("GET /healthz", server.Health())` and `mux.Handle("GET /readyz",
+  server.Ready(checks...))` with `server.Probes(mux, checks...)`, in the same place (before Access).
+  An app without readiness checks passes none. An app with its own `/version` route drops it.
+- The chart sets `APP_VERSION` (the released chart version) and `APP_COMMIT` (the chart's
+  `appVersion`, the commit): platform-charts' `app-chart` from 0.8.0 does it; an app with its own
+  Deployment template adds both (as the scaffold's `deploy/templates/deployment.yaml` does).
+- Check after the release: `GET /version` shows the release and its commit.
+
 # Migrating to v1.16.0
 
 Compatible; no registry file changes for installed modules, so `check` stays green after the pin

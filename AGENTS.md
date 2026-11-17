@@ -7,7 +7,7 @@ Small Go primitives for the platforms' first-party apps; a toolkit, not a framew
 - `profile`: `/api/me` for the frontend module `profile` (person, photo, settings, language, other apps; the menu).
 - `agentkit`: shared parts of an app's MCP tools (caller ceilings, references, runs, cut results).
 - `httpx`: request IDs, bounded JSON decoding, `{"error":"..."}` envelope, API 404.
-- `server`: bounded `http.Server`, `Health` (/healthz), `Ready` (/readyz), graceful shutdown.
+- `server`: bounded `http.Server`, `Health` (/healthz), `Ready` (/readyz), `Version` (/version from `APP_VERSION`/`APP_COMMIT`), `Probes` (all three), graceful shutdown.
 - `sqlite`: bounded pure-Go SQLite (WAL, BEGIN IMMEDIATE), read-only, snapshots, forward-only migrations.
 - `web`: embedded SPA with cache rules, `PublicFiles` for /pwa/, security `Headers`.
 - `googleauth`: a person's Google grant (consent URL, code exchange, refresh token sealed in Omni's format, cached access tokens); storage stays in apps, never revoke.

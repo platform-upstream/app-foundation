@@ -65,7 +65,7 @@ func TestGenerateRendersCompleteApp(t *testing.T) {
 		"go.mod":                              {"module github.com/acme-apps/field-notes", "app-foundation v1.0.0", "go 1.27.0"},
 		"cmd/field-notes/main.go":             {`"github.com/acme-apps/field-notes/internal/api"`, `"127.0.0.1:8150"`, "identity.Middleware(who.resolver, who.options)"},
 		"deploy/values.yaml":                  {"repository: registry.example.org/acme-apps/field-notes", "hostname: field-notes.apps.example.org", `cfTeamDomain: ""`},
-		"deploy/templates/deployment.yaml":    {`required "cfTeamDomain is required`, "path: /readyz", "path: /healthz"},
+		"deploy/templates/deployment.yaml":    {`required "cfTeamDomain is required`, "path: /readyz", "path: /healthz", "name: APP_VERSION"},
 		"deploy/Chart.yaml":                   {"name: field-notes"},
 		"Dockerfile":                          {"./cmd/field-notes", "static-debian13:nonroot", "-modules api,pwa,pwa-shell,touch,motion,sheet,toast,phone-audit\n"},
 		".ci/pipeline.yaml":                   {"name: field-notes"},

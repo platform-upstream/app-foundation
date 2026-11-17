@@ -13,13 +13,14 @@ import (
 	"__MODULE__/internal/store"
 )
 
-// Only /healthz, /readyz and the /pwa/ files (manifest and icons for the iOS home screen) answer
+// Only /healthz, /readyz, /version and the /pwa/ files (manifest and icons for the iOS home screen) answer
 // without a session; the document, the API and every other file need one.
 func TestOnlyProbesAndPWAFilesArePublic(t *testing.T) {
 	handler := testHandler(t)
 	for path, want := range map[string]int{
 		"/healthz":                  http.StatusOK,
 		"/readyz":                   http.StatusOK,
+		"/version":                  http.StatusOK,
 		"/pwa/manifest.webmanifest": http.StatusOK,
 		"/pwa/icon-180.png":         http.StatusOK,
 		"/pwa/":                     http.StatusUnauthorized,

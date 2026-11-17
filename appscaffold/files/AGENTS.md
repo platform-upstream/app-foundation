@@ -27,7 +27,7 @@ owner `local`.
 
 ## Structure
 
-- Go: `cmd/__APP_NAME__/main.go` composes the routes (security headers, `/healthz`, public
+- Go: `cmd/__APP_NAME__/main.go` composes the routes (security headers, probes `/healthz`, `/readyz`, `/version`, public
   `/pwa/`, then Access for everything else). Thin handlers in `internal/api`, logic in domain
   packages, SQL only in `internal/store`, forward-only migrations in `migrations/`
   (`002_<name>.sql`, never edit an applied one). Each outside service behind one small interface.
