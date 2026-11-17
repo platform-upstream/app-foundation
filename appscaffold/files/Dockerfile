@@ -1,6 +1,6 @@
-# syntax=docker/dockerfile:1.28
+# syntax=docker/dockerfile:1.29@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183
 
-FROM node:26-alpine AS frontend
+FROM node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS frontend
 WORKDIR /src/web
 COPY web/package.json web/pnpm-lock.yaml ./
 # pnpm comes from npm at the version package.json names: Node 25 and later ship no corepack.
@@ -12,7 +12,7 @@ RUN --mount=type=cache,id=pnpm-${CACHE_SCOPE},target=/root/.local/share/pnpm/sto
 COPY web/ ./
 RUN pnpm run typecheck && pnpm run build
 
-FROM golang:1.27.3-alpine AS builder
+FROM golang:1.27.4-alpine@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280 AS builder
 WORKDIR /src
 COPY go.mod go.sum ./
 COPY vendor/ ./vendor/
@@ -32,7 +32,7 @@ RUN --mount=type=cache,id=gobuild-${CACHE_SCOPE},target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=linux go build -mod=vendor -p 2 -trimpath \
     -ldflags='-s -w' -o /out/app ./cmd/__APP_NAME__
 
-FROM gcr.io/distroless/static-debian13:nonroot
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:aafe993665bf6200db38a02c11a9351e782a84b6a45e7f33b6695638c88e3931
 COPY --from=builder /out/app /app
 USER 65532:65532
 EXPOSE 8080
