@@ -70,7 +70,7 @@ export function canScrollY(el: Element | null): boolean {
       // A scroller at its end still takes the drag: its overscroll-behavior: contain stops it there.
       return true;
     }
-    if (node.classList.contains('app-shell')) return false;
+    if (node.classList.contains('app-shell') || node.tagName === 'DIALOG') return false;
   }
   return false;
 }
@@ -80,7 +80,8 @@ export function canScrollY(el: Element | null): boolean {
  * screen high, <main> scrolls inside), yet iOS standalone moves the whole page with the nav off the
  * bottom edge when a vertical drag starts where nothing can scroll: on the nav, the top bar or a page
  * shorter than the screen (overscroll-behavior on the root does not stop it, iOS 26, 2026-11-21).
- * Such drags are cancelled; horizontal drags, pinch zoom and anything inside a scroller stay native.
+ * The same holds inside an open <dialog> (sheets, menus). Such drags are cancelled; horizontal drags,
+ * pinch zoom and anything inside a scroller stay native.
  */
 export function useNoShellRubberBand(): void {
   useEffect(() => {
@@ -102,7 +103,8 @@ export function useNoShellRubberBand(): void {
         const dy = touch.clientY - startY;
         if (Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
         const target = event.target instanceof Element ? event.target : null;
-        const inShell = !!target?.closest('.app-shell');
+        // Open sheets and menus are <dialog>s in the top layer, outside the shell: guarded the same way.
+        const inShell = !!target?.closest('.app-shell, dialog[open]');
         decided = !inShell || Math.abs(dx) > Math.abs(dy) || canScrollY(target) ? 'native' : 'blocked';
       }
       if (decided === 'blocked' && event.cancelable) event.preventDefault();

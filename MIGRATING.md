@@ -1,3 +1,9 @@
+# Migrating to v1.17.4
+
+Registry file change in `pwa-shell` (`viewport.ts`): `go tool frontend-registry sync` after the pin
+bump. The rubber-band guard also covers open `<dialog>`s (sheets, menus in the top layer), which
+are outside the shell: a vertical drag on their non-scrolling parts no longer moves the page.
+
 # Migrating to v1.17.3
 
 Registry file change in `pwa-shell` (`viewport.ts`): `go tool frontend-registry sync` after the pin
