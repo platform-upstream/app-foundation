@@ -1,3 +1,8 @@
+# Migrating to v1.17.2
+
+Registry file change in `pwa-shell` (`viewport.ts`): `go tool frontend-registry sync` after the pin
+bump. The rubber-band guard of v1.17.1 now compiles under `noUncheckedIndexedAccess`.
+
 # Migrating to v1.17.1
 
 Registry file change in `pwa-shell` (`AppShell.tsx`, `viewport.ts`): `go tool frontend-registry sync`

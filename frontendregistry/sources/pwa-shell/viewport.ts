@@ -96,9 +96,11 @@ export function useNoShellRubberBand(): void {
     };
     const onMove = (event: TouchEvent) => {
       if (decided === 'native' || event.touches.length !== 1) return;
+      const touch = event.touches[0];
+      if (!touch) return;
       if (decided === null) {
-        const dx = event.touches[0].clientX - startX;
-        const dy = event.touches[0].clientY - startY;
+        const dx = touch.clientX - startX;
+        const dy = touch.clientY - startY;
         if (Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
         const target = event.target instanceof Element ? event.target : null;
         const inShell = !!target?.closest('.app-shell');
