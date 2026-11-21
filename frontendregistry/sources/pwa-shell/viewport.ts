@@ -61,9 +61,8 @@ export function useVisualViewport(): boolean {
   return keyboardOpen;
 }
 
-/** Whether el or an ancestor below the shell can still scroll vertically in the drag's direction
- *  (dy < 0: the finger moves up, the content would scroll down). */
-export function canScrollY(el: Element | null, dy: number): boolean {
+/** Whether el or an ancestor below the shell is a vertical scroller with content to scroll. */
+export function canScrollY(el: Element | null): boolean {
   for (let node = el; node && node !== document.documentElement; node = node.parentElement) {
     if (!(node instanceof HTMLElement)) continue;
     const overflow = getComputedStyle(node).overflowY;
@@ -104,7 +103,7 @@ export function useNoShellRubberBand(): void {
         if (Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
         const target = event.target instanceof Element ? event.target : null;
         const inShell = !!target?.closest('.app-shell');
-        decided = !inShell || Math.abs(dx) > Math.abs(dy) || canScrollY(target, dy) ? 'native' : 'blocked';
+        decided = !inShell || Math.abs(dx) > Math.abs(dy) || canScrollY(target) ? 'native' : 'blocked';
       }
       if (decided === 'blocked' && event.cancelable) event.preventDefault();
     };

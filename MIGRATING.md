@@ -1,3 +1,9 @@
+# Migrating to v1.17.3
+
+Registry file change in `pwa-shell` (`viewport.ts`): `go tool frontend-registry sync` after the pin
+bump. `canScrollY` drops its unused second parameter, so the file compiles under
+`noUnusedParameters` (Console).
+
 # Migrating to v1.17.2
 
 Registry file change in `pwa-shell` (`viewport.ts`): `go tool frontend-registry sync` after the pin
