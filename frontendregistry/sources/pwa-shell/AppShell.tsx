@@ -1,7 +1,7 @@
 // Shared PWA shell mechanics (app-foundation registry module `pwa-shell`). Registry-owned: do not
 // edit in an application. Import ./shell.css before the application's own CSS.
 import { useEffect, useRef, type ComponentPropsWithRef, type ReactNode } from 'react';
-import { useVisualViewport } from './viewport.js';
+import { useNoShellRubberBand, useVisualViewport } from './viewport.js';
 
 export interface AppShellProps {
   /** Required. Carries the page title and pads env(safe-area-inset-top) itself. */
@@ -26,6 +26,7 @@ export interface AppShellProps {
  */
 export function AppShell({ topBar, nav, sidebar, className, mainProps, children }: AppShellProps) {
   const keyboardOpen = useVisualViewport();
+  useNoShellRubberBand();
   const navSlot = useRef<HTMLDivElement>(null);
   const showNav = nav != null && !keyboardOpen;
 

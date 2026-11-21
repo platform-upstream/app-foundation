@@ -1,3 +1,13 @@
+# Migrating to v1.17.1
+
+Registry file change in `pwa-shell` (`AppShell.tsx`, `viewport.ts`): `go tool frontend-registry sync`
+after the pin bump (Renovate's `foundation-sync.sh` does it). Nothing else to change.
+
+- The shell no longer rubber-bands on iOS: a vertical drag that starts where nothing can scroll (the
+  nav, the top bar, a page shorter than the screen) is cancelled by `useNoShellRubberBand`, which
+  `AppShell` calls. Drags inside a scroller, horizontal drags, pinch zoom and overlays outside the
+  shell stay native.
+
 # Migrating to v1.17.0
 
 Compatible; no registry file changes. New in `server`: `Version()` answers `GET /version` with

@@ -60,3 +60,57 @@ export function useVisualViewport(): boolean {
   }, []);
   return keyboardOpen;
 }
+
+/** Whether el or an ancestor below the shell can still scroll vertically in the drag's direction
+ *  (dy < 0: the finger moves up, the content would scroll down). */
+export function canScrollY(el: Element | null, dy: number): boolean {
+  for (let node = el; node && node !== document.documentElement; node = node.parentElement) {
+    if (!(node instanceof HTMLElement)) continue;
+    const overflow = getComputedStyle(node).overflowY;
+    if ((overflow === 'auto' || overflow === 'scroll') && node.scrollHeight > node.clientHeight + 1) {
+      // A scroller at its end still takes the drag: its overscroll-behavior: contain stops it there.
+      return true;
+    }
+    if (node.classList.contains('app-shell')) return false;
+  }
+  return false;
+}
+
+/**
+ * Keeps iOS from rubber-banding the whole shell. The document never scrolls (the shell is one
+ * screen high, <main> scrolls inside), yet iOS standalone moves the whole page with the nav off the
+ * bottom edge when a vertical drag starts where nothing can scroll: on the nav, the top bar or a page
+ * shorter than the screen (overscroll-behavior on the root does not stop it, iOS 26, 2026-11-21).
+ * Such drags are cancelled; horizontal drags, pinch zoom and anything inside a scroller stay native.
+ */
+export function useNoShellRubberBand(): void {
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('ontouchstart' in window)) return;
+    let startX = 0;
+    let startY = 0;
+    let decided: 'native' | 'blocked' | null = null;
+    const onStart = (event: TouchEvent) => {
+      decided = event.touches.length === 1 ? null : 'native';
+      startX = event.touches[0]?.clientX ?? 0;
+      startY = event.touches[0]?.clientY ?? 0;
+    };
+    const onMove = (event: TouchEvent) => {
+      if (decided === 'native' || event.touches.length !== 1) return;
+      if (decided === null) {
+        const dx = event.touches[0].clientX - startX;
+        const dy = event.touches[0].clientY - startY;
+        if (Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
+        const target = event.target instanceof Element ? event.target : null;
+        const inShell = !!target?.closest('.app-shell');
+        decided = !inShell || Math.abs(dx) > Math.abs(dy) || canScrollY(target, dy) ? 'native' : 'blocked';
+      }
+      if (decided === 'blocked' && event.cancelable) event.preventDefault();
+    };
+    document.addEventListener('touchstart', onStart, { passive: true });
+    document.addEventListener('touchmove', onMove, { passive: false });
+    return () => {
+      document.removeEventListener('touchstart', onStart);
+      document.removeEventListener('touchmove', onMove);
+    };
+  }, []);
+}
