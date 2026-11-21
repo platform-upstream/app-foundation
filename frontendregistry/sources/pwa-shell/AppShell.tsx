@@ -9,6 +9,10 @@ export interface AppShellProps {
   /** The application's bottom nav. It paints its own background and safe-area padding, is never
    *  position:fixed, and hides itself where a sidebar takes over (e.g. `md:hidden`). */
   nav?: ReactNode;
+  /** Optional bar between the scrolling <main> and the nav, e.g. a composer. It stays while the soft
+   *  keyboard is open (the nav goes), so it sits on the keyboard's edge and never scrolls with the
+   *  page: an input inside <main> makes the browser scroll the page on every keystroke. */
+  footer?: ReactNode;
   /** Optional desktop sidebar, rendered before the column. */
   sidebar?: ReactNode;
   /** Classes for the outer element, e.g. the application's desktop row layout. */
@@ -19,12 +23,12 @@ export interface AppShellProps {
 }
 
 /**
- * Shell > sidebar + column; column = top bar, scrolling <main>, nav as the last flex child. The
+ * Shell > sidebar + column; column = top bar, scrolling <main>, optional footer, nav as the last flex child. The
  * nav is left out while the soft keyboard is open. The nav slot's height is published as
  * --shell-nav-height on <html> (0px without a visible nav) for toasts and floating buttons.
  * Overlays, dialogs and skip links belong outside, as siblings of <AppShell>.
  */
-export function AppShell({ topBar, nav, sidebar, className, mainProps, children }: AppShellProps) {
+export function AppShell({ topBar, nav, footer, sidebar, className, mainProps, children }: AppShellProps) {
   const keyboardOpen = useVisualViewport();
   useNoShellRubberBand();
   const navSlot = useRef<HTMLDivElement>(null);
@@ -50,6 +54,7 @@ export function AppShell({ topBar, nav, sidebar, className, mainProps, children 
         <main {...main} className={classes('app-shell-main', mainClassName)}>
           {children}
         </main>
+        {footer != null && <div className="app-shell-footer">{footer}</div>}
         {showNav && (
           <div ref={navSlot} className="app-shell-nav">
             {nav}

@@ -1,3 +1,11 @@
+# Migrating to v1.18.0
+
+Compatible. Registry file change in `pwa-shell` (`AppShell.tsx`, `shell.css`):
+`go tool frontend-registry sync` after the pin bump. New optional `footer` slot of `AppShell`: a bar
+between the scrolling `<main>` and the nav that stays while the soft keyboard is open (the nav
+goes). Put a composer there instead of `position: sticky` inside `<main>`: an input inside the
+scroller makes the browser scroll the page on every keystroke.
+
 # Migrating to v1.17.4
 
 Registry file change in `pwa-shell` (`viewport.ts`): `go tool frontend-registry sync` after the pin
