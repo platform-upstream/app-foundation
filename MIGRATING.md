@@ -1,3 +1,10 @@
+# Migrating to v1.19.1
+
+Compatible. Registry file change in `kids` (`Kids.tsx`, `kids.css`): `go tool frontend-registry sync`
+after the pin bump. A tile takes the game's own `className` and `style` (Garage's colour per
+player, Color's ring in the kid's colour); on a phone the takeover's choice wraps under the name
+instead of being cut.
+
 # Migrating to v1.19.0
 
 Compatible. New Go package `kids` and registry module `kids` (`src/foundation/kids.ts`, `Kids.tsx`,

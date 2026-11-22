@@ -4,7 +4,7 @@
 // the game's own fields), the takeover and the account actions. No look: the classes below sit in
 // @layer foundation for layout only; the game paints them and passes its button classes.
 // Content only: the game puts the form and the takeover into its own sheet or modal.
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { AS_NEW, NOT_YET, contactHref, fill, kidsText, shrinkPhoto, suggestTarget, type KidsLanguage, type KidsText } from './kids.js';
 
 export { AS_NEW, NOT_YET, blobToDataURL, kidsText, shrinkPhoto, suggestTarget, type KidsLanguage, type KidsText } from './kids.js';
@@ -62,6 +62,9 @@ export interface TileKid {
   detail?: ReactNode;
   /** false: never edited from the tiles (e.g. the signed-in adult shown as a player). */
   editable?: boolean;
+  /** The game's own class and style for this tile (a colour per kid, a ring). */
+  className?: string;
+  style?: CSSProperties;
 }
 
 /** A kid's face: the photo, else the game's fallback, else the initial. */
@@ -120,7 +123,8 @@ export function KidTiles({ kids, active, onPick, guest, canAdd, onAdd, onEdit, w
             <button
               key={k.id}
               type="button"
-              className="kids-tile"
+              className={['kids-tile', k.className].filter(Boolean).join(' ')}
+              style={k.style}
               aria-pressed={editing ? undefined : k.id === active}
               aria-label={edit ? fill(t.editKid, { name: k.name }) : undefined}
               disabled={editing && !edit}
