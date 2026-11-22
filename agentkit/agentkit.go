@@ -1,8 +1,8 @@
 // Package agentkit holds what an app's MCP tools share, whatever the app: the caller keys and their
 // ceilings, the tool classes, the reference format, the run a write belongs to, and the shape of a
 // cut result. The rules behind it are the mcp-tools skill (~/.agents/skills/mcp-tools/SKILL.md).
-// Finance and Paper use it first (workspace docs/finance-mcp-plan.md); apps keep their own tools,
-// write log and undo, since their schemas differ.
+// AddTool and Handler are the registration and the /mcp route every app built alike. Apps keep their
+// own tools, write log and undo, since their schemas differ.
 package agentkit
 
 import (

@@ -325,6 +325,7 @@ func TestExchange(t *testing.T) {
 			userinfo: func(w http.ResponseWriter, _ *http.Request) {
 				writeJSON(w, http.StatusOK, map[string]any{"sub": "1", "email": "alice@example.org"})
 			},
+			wantErr: ErrAccount,
 			errText: "not verified",
 		},
 		{
@@ -333,12 +334,14 @@ func TestExchange(t *testing.T) {
 			userinfo: func(w http.ResponseWriter, _ *http.Request) {
 				writeJSON(w, http.StatusOK, map[string]any{"email_verified": true})
 			},
+			wantErr: ErrAccount,
 			errText: "no account",
 		},
 		{
 			name:     "userinfo refused",
 			code:     "4/code",
 			userinfo: func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusForbidden) },
+			wantErr:  ErrAccount,
 			errText:  "userinfo: HTTP 403",
 		},
 		{
