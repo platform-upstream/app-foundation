@@ -44,6 +44,9 @@
     "busy": {
       "description": "Busy cues without a look: a gate (delay before showing, minimum visible time), useDelayedBusy, an always-mounted indeterminate BusyBar with a live region, and PendingScope that dims and blurs [data-result] by the app's custom properties while results recompute."
     },
+    "kids": {
+      "description": "Kid profiles in a game without a look: KidsProvider (de/en copy, the game's button classes), KidTiles (photos, \"+ Kind\" last, guest note, Bearbeiten, takeover banner), KidForm (name, optional 512px photo, the game's fields, remove), Adopt (guest kids after a sign-in), AccountActions, shrinkPhoto; backend: Go package kids."
+    },
     "phone-audit": {
       "description": "Playwright phone audit at 375x667 and 390x844 (touch): sideways pan, text and number overflow, 44px targets, 16px fields, 14px text, axe, autofocus, refetch layout shift, reduced motion, platform rules."
     }
@@ -90,6 +93,9 @@
     { "module": "busy", "source": "sources/busy/busy.ts", "target": "src/foundation/busy.ts" },
     { "module": "busy", "source": "sources/busy/Busy.tsx", "target": "src/foundation/Busy.tsx" },
     { "module": "busy", "source": "sources/busy/busy.css", "target": "src/foundation/busy.css" },
+    { "module": "kids", "source": "sources/kids/kids.ts", "target": "src/foundation/kids.ts" },
+    { "module": "kids", "source": "sources/kids/Kids.tsx", "target": "src/foundation/Kids.tsx" },
+    { "module": "kids", "source": "sources/kids/kids.css", "target": "src/foundation/kids.css" },
     { "module": "phone-audit", "source": "sources/phone-audit/phone-audit.ts", "target": "e2e/foundation/phone-audit.ts" },
     { "module": "phone-audit", "source": "sources/phone-audit/phone-audit-tests.ts", "target": "e2e/foundation/phone-audit-tests.ts" }
   ]

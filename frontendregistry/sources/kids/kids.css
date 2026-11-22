@@ -1,0 +1,67 @@
+/* Kid tiles, form, takeover and account actions (app-foundation registry module `kids`).
+   Registry-owned: do not edit in an application. Layout only, in @layer foundation: colours,
+   radii, shadows and fonts are the game's (paint .kids-tile, .kids-face, .kids-banner …).
+   Sizes: --kids-face (tile photo, 72px), --kids-face-small (rows, 44px), --kids-preview (form, 64px). */
+@layer foundation {
+  .kids-tiles { display: grid; gap: 12px; min-width: 0; }
+
+  .kids-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(calc(var(--kids-face, 72px) + 24px), 1fr));
+    gap: 12px;
+  }
+  .kids-tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    min-height: 44px;
+    padding: 10px 6px;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: center;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .kids-tile .kids-name, .kids-tile .kids-detail { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .kids-face {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: var(--kids-face, 72px);
+    height: var(--kids-face, 72px);
+    overflow: hidden;
+  }
+  .kids-face > img, .kids-face > svg { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .kids-adopt-row .kids-face { width: var(--kids-face-small, 44px); height: var(--kids-face-small, 44px); }
+  .kids-face.kids-preview { width: var(--kids-preview, 64px); height: var(--kids-preview, 64px); }
+  .kids-add-face { line-height: 1; }
+
+  .kids-edit-mark { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 28px; height: 28px; }
+
+  .kids-note, .kids-banner, .kids-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin: 0;
+  }
+  .kids-banner > span { flex: 1 1 12em; min-width: 0; }
+
+  .kids-form, .kids-adopt, .kids-account, .kids-confirm { display: grid; gap: 14px; min-width: 0; }
+  .kids-account > p, .kids-confirm > p, .kids-lead, .kids-error { margin: 0; }
+  .kids-field { display: grid; gap: 6px; min-width: 0; }
+  .kids-field input { min-width: 0; width: 100%; box-sizing: border-box; }
+  .kids-photo-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  .kids-danger-zone { justify-content: flex-start; }
+
+  .kids-adopt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .kids-adopt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .kids-adopt-who { flex: 1 1 8em; display: grid; min-width: 0; }
+  .kids-adopt-row select { flex: 1 1 10em; min-width: 0; min-height: 44px; }
+}

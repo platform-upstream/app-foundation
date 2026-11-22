@@ -1,3 +1,19 @@
+# Migrating to v1.19.0
+
+Compatible. New Go package `kids` and registry module `kids` (`src/foundation/kids.ts`, `Kids.tsx`,
+`kids.css`), extracted from the four games that each carried their own `internal/directory` and
+kid UI.
+
+- Go: `kids.New(identity.Config, app)` replaces an app's own directory client for kid profiles;
+  `kids.NewRoster(client).Run(ctx, time.Minute, link, after)` replaces the minute sync. Refusals are
+  `*kids.Error` (`kids.Status(err)`, `errors.Is(err, kids.ErrConflict)` …); a 5xx or network error
+  is a plain error. `Roster` kids carry `Trusted`: an owner acts for them and no family of theirs
+  is run by a self-registered adult (the only kids that may take over an older kid by name).
+- Frontend: `go tool frontend-registry install -modules kids`, add `kids` to the Dockerfile's
+  `check`, import `foundation/kids.css` after `shell.css`, wrap the kid places in `<KidsProvider
+  lang button primary danger link onSignIn>` and paint the `kids-*` classes in the app's CSS.
+  The components render content only: put `KidForm` and `Adopt` into the app's own sheet.
+
 # Migrating to v1.18.0
 
 Compatible. Registry file change in `pwa-shell` (`AppShell.tsx`, `shell.css`):

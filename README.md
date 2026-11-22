@@ -11,6 +11,10 @@ The initial packages are:
 - `identity`: who a signed-in caller is: the directory person (id, name, photo, role in this app,
   the kid profiles they act for) from directory's in-cluster identity API, cached with
   stale-if-error, as `Middleware` after access that fails closed; `identitytest` fakes directory.
+- `kids`: the kid profiles an app takes from directory: a `Roster` of the kids granted the app
+  (families, admins, photo versions, which kids may take over an older kid by name), synced
+  once a minute, and a family admin's changes from a signup app (create, rename, delete a kid,
+  its photo); the frontend half is the registry module `kids`.
 - `agentkit`: what an app's MCP tools at `/mcp` share (the `mcp-tools` skill): caller keys with
   class ceilings behind `access.Internal`, a second door for agents outside the cluster
   (`GuardRemote`, ceiling at most prepare), references `<app>:<noun>/<id>`, idle-bounded runs, cut

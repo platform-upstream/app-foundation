@@ -4,6 +4,7 @@ Small Go primitives for the platforms' first-party apps; a toolkit, not a framew
 
 - `access`: Cloudflare Access JWT, fail-closed local mode, `ConfigFromEnv`, bearer guards `Internal`/`Remote`.
 - `identity`: Access caller → directory person (role, actsFor, spaces), cached with stale-if-error, `Middleware` after access, fail closed; fake `identitytest`.
+- `kids`: directory's kid profiles for games (`Client`: families, kid create/rename/delete/photo for a family admin, `SelfRegistered`, `AdminFamily`; `Roster`: kids granted the app, synced) and registry module `kids` (tiles, kid form, guest note, takeover, account actions; content only, no look, de/en).
 - `profile`: `/api/me` for the frontend module `profile` (person, photo, settings, language, other apps; the menu).
 - `agentkit`: shared parts of an app's MCP tools (caller ceilings, references, runs, cut results).
 - `httpx`: request IDs, bounded JSON decoding, `{"error":"..."}` envelope, API 404.
