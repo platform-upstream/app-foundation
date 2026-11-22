@@ -9,10 +9,9 @@ working example. It renders once and refuses to replace anything; every file the
 app. Generation rejects symlink parents and uses root-confined atomic writes.
 
 ```bash
-go env -w GOPRIVATE=github.com/platform-upstream/*
 go run github.com/platform-upstream/app-foundation/cmd/app-scaffold@vX.Y.Z \
   -platform ../platform-config/platform.json -target ./notes -name notes -title "Notes"
-cd notes && go mod tidy && go mod vendor
+cd notes && go mod tidy
 ```
 
 ## Platform profile
@@ -33,7 +32,8 @@ chart's `cfTeamDomain` is empty and required, set by the deployment wrapper. `-o
 ## What the generated app follows
 
 - Dockerfile: Node 26 + pnpm from npm (`packageManager`), Go stage with `frontend-registry check`,
-  gofmt, vet and tests against `vendor/`, distroless static non-root runtime. Cache mounts end in
+  gofmt, vet and tests, distroless static non-root runtime. Modules come from `go mod download`
+  (public proxy, checked against `go.sum`); module and build cache mounts end in
   `-${CACHE_SCOPE}` (CI contract).
 - Chart: chart-owned image, RollingUpdate with a native `preStop` sleep (Kubernetes 1.30+), PVC
   with `helm.sh/resource-policy: keep`, read-only root filesystem, UID 65532, readiness on

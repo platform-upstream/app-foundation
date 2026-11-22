@@ -11,10 +11,9 @@ paths:
   - .dockerignore
   - go.mod
   - go.sum
-  - vendor/**
 verify:
   # The pnpm verifier has no Go toolchain. The credential-free Docker builder runs
-  # Go format-check, vet, and tests against the vendored module graph.
+  # Go format-check, vet, and tests (modules from the public Go proxy, checked against go.sum).
   install: (cd web && pnpm install --frozen-lockfile)
   steps:
     - (cd web && pnpm run typecheck)

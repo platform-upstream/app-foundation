@@ -15,21 +15,27 @@ RUN pnpm run typecheck && pnpm run build
 FROM golang:1.27.4-alpine@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280 AS builder
 WORKDIR /src
 COPY go.mod go.sum ./
-COPY vendor/ ./vendor/
+ARG CACHE_SCOPE=local
+# The module cache is per CACHE_SCOPE like the build cache: pull-request builds never
+# write what deliveries read.
+RUN --mount=type=cache,id=gomod-${CACHE_SCOPE},target=/go/pkg/mod \
+    go mod download
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
 COPY migrations/ ./migrations/
 COPY web/ ./web/
 COPY --from=frontend /src/web/dist ./web/dist
 # Registry-owned frontend files must match the pinned app-foundation (sync after a bump).
-RUN go tool frontend-registry check -target web -modules __CHECKED_MODULES__
-ARG CACHE_SCOPE=local
-RUN --mount=type=cache,id=gobuild-${CACHE_SCOPE},target=/root/.cache/go-build \
+RUN --mount=type=cache,id=gomod-${CACHE_SCOPE},target=/go/pkg/mod \
+    go tool frontend-registry check -target web -modules __CHECKED_MODULES__
+RUN --mount=type=cache,id=gomod-${CACHE_SCOPE},target=/go/pkg/mod \
+    --mount=type=cache,id=gobuild-${CACHE_SCOPE},target=/root/.cache/go-build \
     test -z "$(gofmt -l cmd internal migrations web)" && \
-    go vet -mod=vendor ./... && \
-    CGO_ENABLED=0 go test -mod=vendor ./...
-RUN --mount=type=cache,id=gobuild-${CACHE_SCOPE},target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux go build -mod=vendor -p 2 -trimpath \
+    go vet ./... && \
+    CGO_ENABLED=0 go test ./...
+RUN --mount=type=cache,id=gomod-${CACHE_SCOPE},target=/go/pkg/mod \
+    --mount=type=cache,id=gobuild-${CACHE_SCOPE},target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build -p 2 -trimpath \
     -ldflags='-s -w' -o /out/app ./cmd/__APP_NAME__
 
 # Phone audit (e2e/phone.spec.ts, registry module phone-audit): the built UI in Chromium at phone

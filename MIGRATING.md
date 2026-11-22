@@ -1,3 +1,19 @@
+# Migrating to v1.21.1
+
+The module is public now: no `GOPRIVATE`, no git credential, no `vendor/`. Compatible for the code;
+the scaffold's `Dockerfile`, `.ci/pipeline.yaml` and `scripts/foundation-sync.sh` changed, and an
+app follows them once:
+
+- `go get github.com/platform-upstream/app-foundation@vX.Y.Z && go mod tidy`, then `git rm -r
+  vendor` (Go uses `vendor/` only while it exists).
+- Dockerfile Go stage: `COPY vendor/ ./vendor/` becomes `ARG CACHE_SCOPE=local` and
+  `RUN --mount=type=cache,id=gomod-${CACHE_SCOPE},target=/go/pkg/mod go mod download`; every later
+  `RUN` that runs `go` mounts the same cache; drop `-mod=vendor`, `GOPROXY=off` and
+  `GOFLAGS=-mod=vendor`. Do not set `GOPRIVATE` or `GONOSUMDB` for this module: `go.sum` and
+  sum.golang.org check what the proxy serves.
+- `.ci/pipeline.yaml`: drop `vendor/**`; `scripts/foundation-sync.sh`: plain `go tool`.
+- A workstation: `go env -u GOPRIVATE` if it was set for platform-upstream.
+
 # Migrating to v1.21.0
 
 Compatible; no registry file changes. New in `agentkit`: `Tool` (name, class, hints),

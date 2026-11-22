@@ -146,7 +146,7 @@ shapes and what is urgent stay in apps.
 
 **Google grants.** `googleauth` is the consent flow and token handling Omni and Paper each carried,
 on `golang.org/x/oauth2` (Google's endpoint from `endpoints`, not the `google` package, which would
-pull the Cloud metadata client into every consumer's vendor tree). The account comes from OpenID
+pull the Cloud metadata client into every consumer's module graph). The account comes from OpenID
 Connect userinfo, as in both apps, and must have a verified e-mail. The sealed format (ciphertext,
 nonce and tag in separate base64 values, the account's lower-case e-mail as additional data) is
 theirs, so they move over without a new consent; a test opens rows sealed by Omni's code and
@@ -157,24 +157,20 @@ hand an app the others' scopes), and one refresh token per app and person (Googl
 oldest beyond its limit). Tokens and OAuth state stay in the app's own tables; scopes, copy and
 the Google REST calls stay in apps.
 
-## Private-module consumption
+## Consumption
 
-Developers and release automation that resolve the private module need GitHub authentication and:
+The module is public (since 2026-11-22) and resolves like any other, through proxy.golang.org and
+sum.golang.org; no GOPRIVATE, no credential:
 
 ```bash
-go env -w GOPRIVATE=github.com/platform-upstream/*
-go get github.com/platform-upstream/app-foundation@v1.2.0
+go get github.com/platform-upstream/app-foundation@vX.Y.Z
 ```
 
-Any machine that bumps the pin needs a git credential helper for github.com (for example
-`gh auth git-credential`). An environment that sets `GONOPROXY` or `GONOSUMDB` itself loses
-GOPRIVATE's checksum-database exemption; add `GONOSUMDB=github.com/platform-upstream/*` then, or a
-fresh tag fails with `verifying module: … not found`.
-
-Consumers should pin an exact release. For container builds, resolve the module outside the image
-build, then commit the resulting `vendor/` tree and build with `go build -mod=vendor`. This keeps
-GitHub credentials out of build arguments and image layers. `go mod vendor` records the source;
-`go.mod` and `go.sum` retain the exact module version.
+Consumers pin an exact release and commit `go.mod` and `go.sum`, no `vendor/`. The image build
+downloads the modules (`go mod download` into a cache mount, `-${CACHE_SCOPE}` like the build cache)
+and `go.sum` checks them; the scaffold's `Dockerfile` is the reference. A machine with
+`GOPRIVATE=github.com/platform-upstream/*` left over from the private days fetches directly from
+GitHub and skips the checksum database; remove it (`go env -u GOPRIVATE`).
 
 ## Version and release policy
 
