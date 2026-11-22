@@ -16,8 +16,8 @@ FROM golang:1.27.4-alpine@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb910
 WORKDIR /src
 COPY go.mod go.sum ./
 ARG CACHE_SCOPE=local
-# The module cache is per CACHE_SCOPE like the build cache: pull-request builds never
-# write what deliveries read.
+# CI passes CACHE_SCOPE (deliver or verify): pull-request builds never write the deliveries'
+# caches. Modules come from the Go proxy, checked against go.sum.
 RUN --mount=type=cache,id=gomod-${CACHE_SCOPE},target=/go/pkg/mod \
     go mod download
 COPY cmd/ ./cmd/
