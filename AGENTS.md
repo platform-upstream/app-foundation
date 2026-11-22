@@ -6,7 +6,7 @@ Small Go primitives for the platforms' first-party apps; a toolkit, not a framew
 - `identity`: Access caller → directory person (role, actsFor, spaces), cached with stale-if-error, `Middleware` after access, fail closed; fake `identitytest`.
 - `kids`: directory's kid profiles for games (`Client`: families, kid create/rename/delete/photo for a family admin, `SelfRegistered`, `AdminFamily`; `Roster`: kids granted the app, synced) and registry module `kids` (tiles, kid form, guest note, takeover, account actions; content only, no look, de/en).
 - `profile`: `/api/me` for the frontend module `profile` (person, photo, settings, language, other apps; the menu).
-- `agentkit`: shared parts of an app's MCP tools (caller ceilings, references, runs, cut results).
+- `agentkit`: shared parts of an app's MCP tools (caller ceilings, references, runs, cut results, `AddTool`, the `/mcp` `Handler`).
 - `httpx`: request IDs, bounded JSON decoding, `{"error":"..."}` envelope, API 404.
 - `server`: bounded `http.Server`, `Health` (/healthz), `Ready` (/readyz), `Version` (/version from `APP_VERSION`/`APP_COMMIT`), `Probes` (all three), graceful shutdown.
 - `sqlite`: bounded pure-Go SQLite (WAL, BEGIN IMMEDIATE), read-only, snapshots, forward-only migrations.

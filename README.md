@@ -18,7 +18,9 @@ The initial packages are:
 - `agentkit`: what an app's MCP tools at `/mcp` share (the `mcp-tools` skill): caller keys with
   class ceilings behind `access.Internal`, a second door for agents outside the cluster
   (`GuardRemote`, ceiling at most prepare), references `<app>:<noun>/<id>`, idle-bounded runs, cut
-  results and tool errors. Each app keeps its tools, write log and undo.
+  results and tool errors; `AddTool` registers a tool (schema from its input struct with enums,
+  hints from its class, the ceiling check, the summary-plus-JSON answer) and `Handler` serves
+  `/mcp` (Streamable HTTP behind `GuardRemote`, no-store). Each app keeps its tools, write log and undo.
 - `appscaffold`: a one-time repository-local Docker/CI/Helm scaffold generator.
 - `httpx`: opt-in request IDs, strict bounded JSON decoding, an explicit JSON API 404, and the
   standard `{"error":"..."}` shape with application-owned copy and status semantics.

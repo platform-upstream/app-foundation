@@ -1,3 +1,18 @@
+# Migrating to v1.21.0
+
+Compatible; no registry file changes. New in `agentkit`: `Tool` (name, class, hints),
+`AddTool[In, Out]` and `Handler`, the MCP plumbing Paper, Finance, Omni and Memory each carried.
+New in `googleauth`: `ErrAccount`, which `Exchange` wraps when it cannot name a verified account.
+
+- An app's own `addTool` becomes `agentkit.AddTool(agentkit.Tools{Server, Callers, Fail, Links},
+  agentkit.Tool{...}, description, enums, run)`. `Fail` maps a run's error to what the caller
+  reads (the app logs internals there); `Links` adds resource links. The schema, enum paths
+  (dotted, into list items and nested objects) and hints are what the apps built: read-only for
+  read, never open world, destructive only above read, idempotent as set.
+- `mcp.NewStreamableHTTPHandler` + `GuardRemote` + a no-store wrapper becomes
+  `agentkit.Handler(keys, remote, callers, idle, pick)`.
+- Check: the app's `tools/list` answer is byte-identical before and after.
+
 # Migrating to v1.20.0
 
 Compatible for the code. Registry file change in `phone-audit`: `go tool frontend-registry sync`

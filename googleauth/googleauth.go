@@ -59,6 +59,10 @@ var (
 	// ErrMissingScopes: on the consent screen the person unticked a scope the app requires. The
 	// error names the missing scopes; nothing is returned to store, and connecting again asks again.
 	ErrMissingScopes = errors.New("googleauth: required scopes not granted")
+	// ErrAccount: Exchange could not name the account behind the grant (userinfo failed, or the
+	// account has no verified e-mail). Code and scopes were fine; the app may tell the person to
+	// use another account.
+	ErrAccount = errors.New("googleauth: no verified account")
 )
 
 // Config is one OAuth client (type Web application) and what the app asks for.
@@ -194,7 +198,7 @@ type Grant struct {
 // Exchange trades the callback's code for a Grant. The app has already checked the state and
 // read the callback's error parameter (access_denied when the person cancels). Exchange fails
 // with ErrMissingScopes when a required scope was not granted, with ErrInvalidGrant for a code
-// that is expired or used, and when the account has no verified e-mail. verifier is the one
+// that is expired or used, and with ErrAccount when the account has no verified e-mail. verifier is the one
 // AuthCodeURL returned for this state. The access token that comes with the grant is cached for
 // AccessToken.
 func (c *Client) Exchange(ctx context.Context, code, verifier string) (Grant, error) {
@@ -226,21 +230,22 @@ func (c *Client) Exchange(ctx context.Context, code, verifier string) (Grant, er
 	return Grant{RefreshToken: token.RefreshToken, Scopes: granted, Subject: subject, Email: email}, nil
 }
 
-// account names the Google account behind an access token (OpenID Connect userinfo).
+// account names the Google account behind an access token (OpenID Connect userinfo). Every
+// error wraps ErrAccount.
 func (c *Client) account(ctx context.Context, accessToken string) (subject, email string, err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.userInfoURL, nil)
 	if err != nil {
-		return "", "", fmt.Errorf("googleauth: userinfo: %w", err)
+		return "", "", fmt.Errorf("%w: userinfo: %w", ErrAccount, err)
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return "", "", fmt.Errorf("googleauth: userinfo: %w", err)
+		return "", "", fmt.Errorf("%w: userinfo: %w", ErrAccount, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", "", fmt.Errorf("googleauth: userinfo: HTTP %d", resp.StatusCode)
+		return "", "", fmt.Errorf("%w: userinfo: HTTP %d", ErrAccount, resp.StatusCode)
 	}
 	var info struct {
 		Sub      string `json:"sub"`
@@ -248,14 +253,14 @@ func (c *Client) account(ctx context.Context, accessToken string) (subject, emai
 		Verified bool   `json:"email_verified"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, maxUserInfoBytes)).Decode(&info); err != nil {
-		return "", "", fmt.Errorf("googleauth: userinfo: %w", err)
+		return "", "", fmt.Errorf("%w: userinfo: %w", ErrAccount, err)
 	}
 	email = strings.ToLower(strings.TrimSpace(info.Email))
 	if info.Sub == "" || email == "" {
-		return "", "", errors.New("googleauth: userinfo names no account")
+		return "", "", fmt.Errorf("%w: userinfo names no account", ErrAccount)
 	}
 	if !info.Verified {
-		return "", "", errors.New("googleauth: the account's e-mail is not verified")
+		return "", "", fmt.Errorf("%w: the account's e-mail is not verified", ErrAccount)
 	}
 	return info.Sub, email, nil
 }
