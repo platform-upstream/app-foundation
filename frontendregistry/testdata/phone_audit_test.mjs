@@ -79,6 +79,45 @@ assert.ok(!skipped.some((f) => ['small-text', 'layout-shift', 'sideways-pan'].in
 const ignoring = await run('defects.html', phone, {}, { ignore: '#tiny, #fine-print', skip: ['layout-shift', 'sideways-pan'] });
 assert.ok(!ignoring.some((f) => /#tiny|#fine-print/.test(f.selector ?? '')), audit.formatFindings(ignoring));
 
+// covered-target: a veil over a button and a fixed nav over the page's last button are covers; a
+// button the sticky header passes over while scrolling and a pointer-events: none icon are not.
+// The error gate (watchErrors) sees the console error, the exception and the failed request, not
+// the request the page aborted itself.
+{
+  const context = await browser.newContext({ ...audit.phoneContextOptions(phone), baseURL: ORIGIN });
+  await context.route(ORIGIN + '/**', (route) => route.fulfill({ contentType: 'text/html', body: readFileSync(join(fixtures, 'covered.html')) }));
+  await context.route(ORIGIN + '/api/broken', (route) => route.abort('failed'));
+  await context.route(ORIGIN + '/api/slow', async (route) => { await new Promise((resolve) => setTimeout(resolve, 300)); await route.fulfill({ json: {} }).catch(() => {}); });
+  const page = await context.newPage();
+  const errors = audit.watchErrors(page);
+  await audit.installLayoutShiftObserver(page);
+  await audit.openRoute(page, '/');
+  const covered = await audit.auditPage(page, { axe: false, skip: ['layout-shift', 'sideways-pan', 'small-text'] });
+  const coverReport = audit.formatFindings(covered);
+  const coveredIds = covered.filter((f) => f.check === 'covered-target').map((f) => f.selector).sort();
+  assert.deepEqual(coveredIds, ['button#last', 'button#under-veil'], coverReport);
+  assert.match(covered.find((f) => f.selector === 'button#under-veil').detail, /^on load, a tap at \d+,\d+ lands on div\.veil(:nth-of-type\(1\))?$/, coverReport);
+  assert.match(covered.find((f) => f.selector === 'button#last').detail, /^after scrolling \d+px, a tap at \d+,\d+ lands on nav \("Start"\)$/, coverReport);
+  assert.equal(covered.find((f) => f.selector === 'button#last').text, 'Mehr laden');
+  // The audit leaves the page where it was.
+  assert.equal(await page.evaluate(() => window.scrollY), 0);
+  // ignore leaves out a covered control and a cover.
+  const ignoringCovers = await audit.auditPage(page, { axe: false, ignore: '.veil, #last', skip: ['layout-shift', 'sideways-pan', 'small-text'] });
+  assert.ok(!ignoringCovers.some((f) => f.check === 'covered-target'), audit.formatFindings(ignoringCovers));
+  const seen = errors();
+  const kinds = seen.map((f) => f.check).sort();
+  assert.deepEqual(kinds, ['console-error', 'console-error', 'page-error', 'request-failed'], audit.formatFindings(seen));
+  assert.ok(seen.some((f) => f.check === 'page-error' && f.detail.includes('Boom')), audit.formatFindings(seen));
+  assert.ok(seen.some((f) => f.check === 'request-failed' && f.detail.includes('/api/broken')), audit.formatFindings(seen));
+  assert.ok(!seen.some((f) => f.detail.includes('/api/slow')), audit.formatFindings(seen));
+  // allow takes documented noise out.
+  const allowed = audit.watchErrors(page, (e) => e.kind === 'console-error');
+  await page.reload();
+  await audit.settle(page);
+  assert.deepEqual(allowed().map((f) => f.check).sort(), ['page-error', 'request-failed']);
+  await context.close();
+}
+
 const spinning = await run('defects.html', phone, { reducedMotion: 'reduce' });
 assert.ok(spinning.some((f) => f.check === 'running-animation' && f.selector === 'div.spin' && f.detail.includes('"spin"')), audit.formatFindings(spinning));
 

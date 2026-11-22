@@ -7,7 +7,10 @@
  *   phoneAudit({ setup: mockApi, routes: [{ path: '/' }, { path: '/settings' }] });
  *
  * One test per route and phone size (375x667, 390x844), then one reduced-motion test per route at
- * the last size. A failing test lists every finding; the findings are also attached as JSON.
+ * the last size. A failing test lists every finding; the findings are also attached as JSON. Every
+ * test is also an error gate: an uncaught exception, a console error or a failed request while the
+ * route is open fails it (`allowErrors` accepts the application's documented noise, `skip` takes
+ * `page-error`, `console-error`, `request-failed`).
  */
 import { expect, test, type Page } from '@playwright/test';
 import {
@@ -18,6 +21,7 @@ import {
   installLayoutShiftObserver,
   openRoute,
   phoneContextOptions,
+  watchErrors,
   type AuditOptions,
   type Finding,
   type PhoneViewport,
@@ -48,11 +52,16 @@ export interface PhoneAuditConfig extends AuditOptions {
   reducedMotion?: boolean;
 }
 
-async function open(page: Page, config: PhoneAuditConfig, route: PhoneRoute, settleAnimations: boolean): Promise<void> {
+/** Opens the route; the returned function gives the page errors since (the error gate). */
+async function open(page: Page, config: PhoneAuditConfig, route: PhoneRoute, settleAnimations: boolean): Promise<() => Finding[]> {
+  const allow = route.options?.allowErrors ?? config.allowErrors;
+  const skip = new Set([...(config.skip ?? []), ...(route.options?.skip ?? [])]);
+  const errors = watchErrors(page, allow);
   await config.setup?.(page);
   await route.setup?.(page);
   await installLayoutShiftObserver(page);
   await openRoute(page, route.path, route.ready, { animations: settleAnimations });
+  return () => errors().filter((finding) => !skip.has(finding.check));
 }
 
 async function report(findings: Finding[]): Promise<void> {
@@ -69,8 +78,9 @@ export function phoneAudit(config: PhoneAuditConfig): void {
       test.use(phoneContextOptions(viewport, locale ? { locale } : {}));
       for (const route of routes) {
         test(route.name ?? route.path, async ({ page }) => {
-          await open(page, config, route, true);
-          await report(await auditPage(page, { ...shared, ...route.options }));
+          const errors = await open(page, config, route, true);
+          const findings = await auditPage(page, { ...shared, ...route.options });
+          await report([...findings, ...errors()]);
         });
       }
     });
@@ -82,8 +92,9 @@ export function phoneAudit(config: PhoneAuditConfig): void {
     test.use({ ...phoneContextOptions(last, locale ? { locale } : {}), contextOptions: { reducedMotion: 'reduce' } });
     for (const route of routes) {
       test(route.name ?? route.path, async ({ page }) => {
-        await open(page, config, route, false);
-        await report(await auditReducedMotion(page, { ignore: route.options?.ignore ?? config.ignore }));
+        const errors = await open(page, config, route, false);
+        const findings = await auditReducedMotion(page, { ignore: route.options?.ignore ?? config.ignore });
+        await report([...findings, ...errors()]);
       });
     }
   });

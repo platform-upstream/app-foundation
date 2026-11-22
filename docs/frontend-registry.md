@@ -130,9 +130,21 @@ are a starting point, not a shared theme.
   `.hit-target`, are not measured), `number-split`, `tap-target` (44px, counting an invisible
   `::before`/`::after` against its containing block, so a stretched link's `::after` with
   `inset: 0` counts as its card; inline links in text exempt), `input-font` (16px), `small-text`
-  (14px), `autofocus`, `layout-shift` (Layout Instability API in a refetch window), `axe`
+  (14px), `autofocus`, `covered-target` (a visible control a tap cannot reach: at two of its
+  centre and two inset corners `elementFromPoint` finds something else, an overlay, a sticky bar, a
+  neighbour's hit area; the page, else its scroller or `main`, is scrolled in up to `coverSteps`
+  (8) steps and a control counts only when it is covered at every step it was on screen, so
+  content passing under a sticky bar is fine and a row the nav hides at the page end is not;
+  disabled, inert, `aria-hidden`, `pointer-events: none`, hidden, transparent or folded-away
+  (closed `<details>`) controls and
+  everything outside an open modal dialog are left out; a label's control and a field's labels
+  count as the control), `layout-shift` (Layout Instability API in a refetch window), `axe`
   (wcag2a/aa, 2.1 a/aa, 2.2 aa) and, in a pass with `reducedMotion: 'reduce'`,
-  `running-animation`. `sideways-pan` and `layout-shift` need Chromium; elsewhere they report
+  `running-animation`. Every `phoneAudit` test is also an error gate: an uncaught exception
+  (`page-error`), a console error (`console-error`, which includes resources answered 4xx/5xx) or a
+  failed request (`request-failed`; requests the page aborted itself pass) fails it.
+  `allowErrors(error) → boolean` takes out the app's documented noise (a preview its fixtures do
+  not serve); `watchErrors(page, allow)` is the same gate for the app's own specs. `sideways-pan` and `layout-shift` need Chromium; elsewhere they report
   nothing. The app adds `@playwright/test` and `@axe-core/playwright` as devDependencies (or sets
   `axe: false`), a Playwright config with its `baseURL` and server, and one spec it owns:
 
@@ -152,7 +164,8 @@ are a starting point, not a shared theme.
   });
   ```
 
-  Options: `skip` (check names), `ignore` (a selector whose subtree is not reported), `controls`
+  Options: `skip` (check names), `ignore` (a selector whose subtree is not reported and does not
+  count as a cover), `controls`
   (the app's own control classes, judged like buttons), `scroller` (default `.app-shell-main`),
   `minTarget`/`minInputFont`/`minText`, `axe: { tags, disableRules } | false`, `refetch` and
   `refetchWindowMs` (default: a `visibilitychange` and a `focus` event, which refetch only stale
@@ -165,6 +178,32 @@ are a starting point, not a shared theme.
   import with `.ts` extensions, so an `e2e/tsconfig.json` that type-checks them sets
   `allowImportingTsExtensions`. What Chromium cannot show (status bar, `lvh`, the keyboard,
   pull-to-refresh on iOS) stays a short check on an iPhone.
+
+  In CI the audit is a Dockerfile stage, so a finding fails the verify build and the delivery
+  (the scaffold's `Dockerfile` has it): the Playwright image of exactly the `@playwright/test`
+  version in `package.json` (its browsers are in the image; one version for all apps keeps the
+  shared build cache small), the frontend stage's `dist`, `pnpm run test:phone`, and the runtime
+  stage copies the stage's marker so it cannot be skipped. The Playwright config then serves the
+  built UI without building it again (`vite preview`, or the app's own server binary from the
+  builder stage). Locally the same is `pnpm build && pnpm test:phone`.
+
+  ```dockerfile
+  # Phone audit: the built UI in Chromium at phone sizes (e2e/phone.spec.ts). Same version as
+  # @playwright/test in web/package.json; the runtime stage copies /phone-audit.ok.
+  FROM mcr.microsoft.com/playwright:v1.65.0-noble@sha256:<digest> AS phone
+  WORKDIR /src/web
+  COPY web/package.json web/pnpm-lock.yaml ./
+  RUN npm install -g "$(node -p 'require("./package.json").packageManager')"
+  ARG CACHE_SCOPE=local
+  RUN --mount=type=cache,id=pnpm-${CACHE_SCOPE},target=/root/.local/share/pnpm/store \
+      pnpm install --frozen-lockfile
+  COPY web/ ./
+  COPY --from=frontend /src/web/dist ./dist
+  RUN CI=1 pnpm run test:phone && touch /phone-audit.ok
+
+  # ... runtime stage:
+  COPY --from=phone /phone-audit.ok /phone-audit.ok
+  ```
 - `template` supplies only a clean React/Vite entry point, visible application-owned QueryClient
   policy, accessible document defaults, root-origin build configuration, PWA registration, and a
   minimal `AppShell` with a top bar and nav that tells adopters to create an application identity.

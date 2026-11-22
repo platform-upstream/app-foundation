@@ -32,7 +32,22 @@ RUN --mount=type=cache,id=gobuild-${CACHE_SCOPE},target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=linux go build -mod=vendor -p 2 -trimpath \
     -ldflags='-s -w' -o /out/app ./cmd/__APP_NAME__
 
+# Phone audit (e2e/phone.spec.ts, registry module phone-audit): the built UI in Chromium at phone
+# sizes; a finding fails the build. The image's version is @playwright/test's in web/package.json
+# (its browser is in the image); the runtime stage copies the marker, so the stage always runs.
+FROM mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe AS phone
+WORKDIR /src/web
+COPY web/package.json web/pnpm-lock.yaml ./
+RUN npm install -g "$(node -p 'require("./package.json").packageManager')"
+ARG CACHE_SCOPE=local
+RUN --mount=type=cache,id=pnpm-${CACHE_SCOPE},target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
+COPY web/ ./
+COPY --from=frontend /src/web/dist ./dist
+RUN CI=1 pnpm run test:phone && touch /phone-audit.ok
+
 FROM gcr.io/distroless/static-debian13:nonroot@sha256:aafe993665bf6200db38a02c11a9351e782a84b6a45e7f33b6695638c88e3931
+COPY --from=phone /phone-audit.ok /phone-audit.ok
 COPY --from=builder /out/app /app
 USER 65532:65532
 EXPOSE 8080

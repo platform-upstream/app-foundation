@@ -13,6 +13,13 @@
  *                      are intended and pass; visually hidden text such as .sr-only and absolutely
  *                      positioned children and pseudo-elements, as a NavBadge or .hit-target's
  *                      ::after, are left out)
+ *   covered-target     a visible control a tap cannot reach: at two of three points (centre, two
+ *                      inset corners) elementFromPoint finds something else on top (an overlay,
+ *                      a sticky bar, a neighbour's hit area), at every scroll step it was on screen
+ *                      (the document or the scroller is scrolled in up to 8 steps)
+ *   page-error,        with phoneAudit (or watchErrors): an uncaught exception, a console error or
+ *   console-error,     a failed request while the route was open; `allowErrors` accepts the
+ *   request-failed     application's documented noise
  *   number-split       a number is broken across two lines
  *   tap-target         a control is smaller than 44 x 44 (an invisible ::before/::after that grows
  *                      the target, as .hit-target in `touch` or a stretched link's ::after over its
@@ -77,7 +84,7 @@ export interface PlatformRule {
 export interface AuditOptions {
   /** Checks to leave out, by name. */
   skip?: string[];
-  /** Elements matching this selector (and everything inside them) are not reported. */
+  /** Elements matching this selector (and everything inside them) are not reported, nor count as a cover. */
   ignore?: string;
   /** Extra selector for the application's own controls (`.chip, .seg > *`), judged like buttons. */
   controls?: string;
@@ -100,6 +107,13 @@ export interface AuditOptions {
   /** The largest summed layout-shift score allowed in that window (default 0.001: none). */
   maxLayoutShift?: number;
   platformRules?: PlatformRule[];
+  /** Scroll steps of covered-target after the first look (default 8, each 80 % of the scroller). */
+  coverSteps?: number;
+  /**
+   * Page errors the application accepts (phoneAudit's error gate, watchErrors): return true for
+   * documented noise, as a request its mocks fail on purpose. Default: every error counts.
+   */
+  allowErrors?: (error: PageError) => boolean;
 }
 
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
@@ -410,6 +424,176 @@ function focusedField(ignore: string): Finding[] {
   return [{ check: 'autofocus', selector: el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (el.getAttribute('name') ? `[name="${el.getAttribute('name')}"]` : ''), detail: 'a field has focus after load: the keyboard opens and the nav goes' }];
 }
 
+interface CoverOptions {
+  ignore: string;
+  controls: string;
+  scroller: string;
+  maxSteps: number;
+}
+
+/**
+ * Controls a finger cannot reach: at the centre and two inset corners of each visible control,
+ * document.elementFromPoint must find the control, something inside it or around it (a label: its
+ * control too). Two of three points on something else is a cover. The page is scrolled in steps
+ * (the document, else its scroller or `main`) and a control counts only when it is covered at every
+ * step it was on screen, so content passing under a sticky bar while scrolling is not reported, but
+ * a row the nav hides at the end of the page is. Self-contained: Playwright serializes it.
+ */
+async function coveredTargets(options: CoverOptions): Promise<Finding[]> {
+  const selector = 'button, a[href], [role=button], [role=tab], input:not([type=hidden]), select, textarea, summary, label[for]' + (options.controls ? ', ' + options.controls : '');
+  const ignored = (el: Element) => !!options.ignore && !!el.closest(options.ignore);
+  const describe = (el: Element): string => {
+    const parts: string[] = [];
+    for (let node: Element | null = el; node && node !== document.body && parts.length < 4; node = node.parentElement) {
+      if (node.id) {
+        parts.unshift(node.tagName.toLowerCase() + '#' + CSS.escape(node.id));
+        break;
+      }
+      const classes = typeof node.className === 'string' ? node.className.trim().split(/\s+/).filter(Boolean).slice(0, 2) : [];
+      let out = node.tagName.toLowerCase() + classes.map((c) => '.' + CSS.escape(c)).join('');
+      const parent: Element | null = node.parentElement;
+      if (parent) {
+        const same = [...parent.children].filter((child) => child.tagName === node!.tagName);
+        if (same.length > 1) out += `:nth-of-type(${same.indexOf(node) + 1})`;
+      }
+      parts.unshift(out);
+    }
+    return parts.join(' > ');
+  };
+  const label = (el: Element) => ((el as HTMLElement).innerText || el.getAttribute('aria-label') || el.getAttribute('title') || (el as HTMLInputElement).placeholder || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  // An open modal dialog makes everything outside it inert.
+  const modal = document.querySelector(':modal');
+  const skipped = (el: Element) => {
+    if (ignored(el) || (el as HTMLButtonElement).disabled || el.closest('[inert], [aria-hidden="true"]')) return true;
+    if (modal && !modal.contains(el)) return true;
+    // Inside a closed <details> or under content-visibility: hidden the box may keep a size, but
+    // nothing of it is painted.
+    if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return true;
+    const style = getComputedStyle(el);
+    return style.visibility === 'hidden' || style.display === 'none' || style.pointerEvents === 'none' || parseFloat(style.opacity) === 0;
+  };
+  // What a tap may land on: the control, inside it, around it; for a label its control, for a field its labels.
+  const reaches = (el: Element, hit: Element) => {
+    if (hit === el || el.contains(hit) || hit.contains(el)) return true;
+    const control = el.tagName === 'LABEL' ? (el as HTMLLabelElement).control : null;
+    if (control && (hit === control || control.contains(hit))) return true;
+    for (const own of (el as HTMLInputElement).labels ?? []) if (own === hit || own.contains(hit)) return true;
+    return false;
+  };
+  // The part of the element on screen: the window, cut by every clipping ancestor up to a fixed one.
+  const onScreen = (el: Element) => {
+    const r = el.getBoundingClientRect();
+    let left = Math.max(r.left, 0), top = Math.max(r.top, 0);
+    let right = Math.min(r.right, document.documentElement.clientWidth), bottom = Math.min(r.bottom, window.innerHeight);
+    for (let a = el.parentElement; a && a !== document.documentElement; a = a.parentElement) {
+      const style = getComputedStyle(a);
+      if (style.overflowX !== 'visible' || style.overflowY !== 'visible') {
+        const c = a.getBoundingClientRect();
+        if (style.overflowX !== 'visible') { left = Math.max(left, c.left); right = Math.min(right, c.right); }
+        if (style.overflowY !== 'visible') { top = Math.max(top, c.top); bottom = Math.min(bottom, c.bottom); }
+      }
+      if (style.position === 'fixed') break;
+    }
+    return right - left >= 4 && bottom - top >= 4 ? { left, top, right, bottom } : null;
+  };
+  const scrollable = (el: Element | null): el is HTMLElement => !!el && el.scrollHeight > el.clientHeight + 1 && /auto|scroll|overlay/.test(getComputedStyle(el).overflowY);
+  const doc = document.scrollingElement ?? document.documentElement;
+  const candidates = [options.scroller ? document.querySelector(options.scroller) : null, document.querySelector('main')];
+  const pane: HTMLElement | null = doc.scrollHeight > window.innerHeight + 1 ? null : candidates.find(scrollable) ?? null;
+  const box = pane ?? doc;
+  const start = box.scrollTop;
+  const frames = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  const quiet = async () => {
+    await frames();
+    const finite = document.getAnimations().filter((a) => a.playState === 'running' && a.effect?.getTiming().iterations !== Infinity);
+    if (finite.length) await Promise.race([Promise.allSettled(finite.map((a) => a.finished)), new Promise((resolve) => setTimeout(resolve, 800))]);
+    await frames();
+  };
+
+  const state = new Map<Element, { clear: boolean; finding?: Finding }>();
+  const probe = (step: number) => {
+    for (const el of document.querySelectorAll(selector)) {
+      if (state.get(el)?.clear || skipped(el)) continue;
+      const area = onScreen(el);
+      if (!area) continue;
+      const w = area.right - area.left, h = area.bottom - area.top;
+      const ix = Math.min(10, w / 4), iy = Math.min(10, h / 4);
+      const points = [[area.left + w / 2, area.top + h / 2], [area.left + ix, area.top + iy], [area.right - ix, area.bottom - iy]];
+      const covers: Element[] = [];
+      for (const [x, y] of points) {
+        const hit = document.elementFromPoint(x, y);
+        if (hit && !reaches(el, hit)) covers.push(hit);
+      }
+      if (covers.length < 2 || covers.some((c) => ignored(c))) {
+        state.set(el, { clear: true });
+        continue;
+      }
+      if (state.has(el)) continue;
+      const cover = covers[0];
+      const where = step === 0 ? 'on load' : `after scrolling ${Math.round(box.scrollTop)}px`;
+      const coverText = label(cover);
+      state.set(el, {
+        clear: false,
+        finding: {
+          check: 'covered-target',
+          selector: describe(el),
+          text: label(el),
+          detail: `${where}, a tap at ${Math.round(points[0][0])},${Math.round(points[0][1])} lands on ${describe(cover)}${coverText ? ` ("${coverText}")` : ''}`,
+        },
+      });
+    }
+  };
+
+  await quiet();
+  probe(0);
+  const max = box.scrollHeight - box.clientHeight;
+  const stride = Math.max(1, Math.round(box.clientHeight * 0.8));
+  for (let step = 1; step <= options.maxSteps && box.scrollTop < max - 1; step++) {
+    box.scrollTo({ top: Math.min(max, box.scrollTop + stride), behavior: 'instant' });
+    await quiet();
+    probe(step);
+  }
+  // Back where it was, and quiet again: a title that fades with the scroll must not be caught
+  // half-way by the checks after this one.
+  box.scrollTo({ top: start, behavior: 'instant' });
+  await quiet();
+  const findings: Finding[] = [];
+  for (const entry of state.values()) if (!entry.clear && entry.finding) findings.push(entry.finding);
+  return findings;
+}
+
+/** A console message, uncaught exception or failed request while a route was open. */
+export interface PageError {
+  kind: 'page-error' | 'console-error' | 'request-failed';
+  text: string;
+  /** The request's or the message's URL, where there is one. */
+  url?: string;
+}
+
+/**
+ * Collects page errors from now on: uncaught exceptions (`pageerror`), console messages of type
+ * error and failed requests. Call before page.goto; the returned function gives the findings so far
+ * (checks `page-error`, `console-error`, `request-failed`). Not counted: requests the page aborted
+ * itself (net::ERR_ABORTED: a navigation, a cancelled fetch) and whatever `allow` accepts, the
+ * application's documented noise (a request its mocks fail on purpose, a third-party warning).
+ */
+export function watchErrors(page: Page, allow?: (error: PageError) => boolean): () => Finding[] {
+  const errors: PageError[] = [];
+  page.on('pageerror', (error) => errors.push({ kind: 'page-error', text: String(error?.stack ?? error).split('\n').slice(0, 3).join(' | ') }));
+  page.on('console', (message) => {
+    if (message.type() !== 'error') return;
+    errors.push({ kind: 'console-error', text: message.text(), url: message.location()?.url || undefined });
+  });
+  page.on('requestfailed', (request) => {
+    const failure = request.failure()?.errorText ?? 'failed';
+    if (/ERR_ABORTED|NS_BINDING_ABORTED|cancelled/i.test(failure)) return;
+    errors.push({ kind: 'request-failed', text: `${request.method()} ${failure}`, url: request.url() });
+  });
+  return () => errors
+    .filter((error) => !allow?.(error))
+    .map((error) => ({ check: error.kind, detail: error.text.slice(0, 300) + (error.url ? ` (${error.url})` : '') }));
+}
+
 async function layoutShift(page: Page, options: AuditOptions): Promise<Finding[]> {
   const supported = await page.evaluate(() => {
     const store = (window as unknown as { __phoneAuditShifts?: { supported: boolean; entries: unknown[] } }).__phoneAuditShifts;
@@ -520,6 +704,13 @@ export async function auditPage(page: Page, options: AuditOptions = {}): Promise
   }));
   if (!skip.has('axe')) findings.push(...await axe(page, options));
   for (const rule of options.platformRules ?? []) if (!skip.has(rule.name)) findings.push(...await rule.run(page));
+  // It scrolls the page: after the checks that read the page as loaded.
+  if (!skip.has('covered-target')) findings.push(...await page.evaluate(coveredTargets, {
+    ignore: options.ignore ?? '',
+    controls: options.controls ?? '',
+    scroller: options.scroller ?? '.app-shell-main',
+    maxSteps: options.coverSteps ?? 8,
+  }));
   if (!skip.has('layout-shift')) findings.push(...await layoutShift(page, options));
   if (!skip.has('sideways-pan')) findings.push(...await sidewaysPan(page, options));
   return findings;

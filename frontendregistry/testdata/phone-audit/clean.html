@@ -29,6 +29,9 @@
   .card { position: relative; padding: 16px; border: 1px solid #555; }
   .card a::after { content: ''; position: absolute; inset: 0; }
   .card a { font-size: 14px; }
+  .bar { position: sticky; top: 0; background: #fff; z-index: 1; }
+  .rows button { display: block; width: 100%; }
+  summary { min-height: 44px; }
   @media (prefers-reduced-motion: no-preference) { .rise { animation: rise 200ms backwards; } }
   @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
 </style>
@@ -36,6 +39,7 @@
 <body>
 <div class="app-shell">
   <main class="app-shell-main">
+    <div class="bar"><button type="button">Zurück</button></div>
     <h1 class="rise">Übersicht</h1>
     <p>Kontostand 1’234’567.80 CHF am 12.11.2026. Mehr im <a href="#hilfe">Hilfeartikel</a> dazu.</p>
     <button type="button">Speichern</button>
@@ -48,6 +52,8 @@
     <button type="button" class="hit-target small-chip">Filter</button>
     <button type="button" class="hit-target small-chip narrow" aria-label="Plus">+</button>
     <div class="card"><h2>Rechnung</h2><a href="#r1">Öffnen</a></div>
+    <details class="card"><summary>Verlauf</summary><button type="button">Rückgängig</button></details>
+    <div class="rows"><button type="button">Zeile 1</button><button type="button">Zeile 2</button><button type="button">Zeile 3</button><button type="button">Zeile 4</button><button type="button">Zeile 5</button><button type="button">Zeile 6</button><button type="button">Zeile 7</button><button type="button">Zeile 8</button><button type="button">Zeile 9</button><button type="button">Zeile 10</button><button type="button">Zeile 11</button><button type="button">Zeile 12</button><button type="button">Zeile 13</button><button type="button">Zeile 14</button><button type="button">Zeile 15</button><button type="button">Zeile 16</button><button type="button">Zeile 17</button><button type="button">Zeile 18</button><button type="button">Zeile 19</button><button type="button">Zeile 20</button><button type="button">Zeile 21</button><button type="button">Zeile 22</button><button type="button">Zeile 23</button><button type="button">Zeile 24</button><button type="button">Zeile 25</button><button type="button">Zeile 26</button><button type="button">Zeile 27</button><button type="button">Zeile 28</button><button type="button">Zeile 29</button><button type="button">Zeile 30</button></div>
     <div class="scroller"><span>Eins</span><span>Zwei</span><span>Drei</span></div>
   </main>
   <nav aria-label="Hauptnavigation"><a href="#a">Start</a><a href="#b"><span class="nav-badge-anchor"><span aria-hidden="true">S</span><span class="nav-badge" role="img" aria-label="12 neue">12</span></span>Suche</a></nav>

@@ -1,3 +1,23 @@
+# Migrating to v1.20.0
+
+Compatible for the code. Registry file change in `phone-audit`: `go tool frontend-registry sync`
+after the pin bump. Two new checks may now fail an app's `pnpm test:phone`; fix what they find:
+
+- `covered-target`: a visible control whose centre and corners a tap cannot reach (an overlay, a
+  sticky bar, the nav over the last row, a neighbour's hit area). It scrolls the page, or the
+  shell's `<main>`, in up to 8 steps and reports a control only when it was covered at every step
+  it was on screen. A finding names the control and what the tap lands on. `ignore` also takes
+  out a cover; `coverSteps` changes the steps.
+- Error gate in `phoneAudit`: an uncaught exception, a console error (also a fixture's 404 for an
+  image or a request) or a failed request while a route is open fails its test. Serve the request
+  in the fixtures, or accept documented noise with `allowErrors: (error) => boolean` (per config or
+  route); `skip: ['console-error']` and the like switch a part off. `watchErrors(page, allow)` is
+  the same gate for an app's own specs.
+
+The audit now also runs in CI: add the `phone` stage of the scaffold's `Dockerfile`
+(`docs/frontend-registry.md`, phone-audit) and let the runtime stage copy its marker; the
+Playwright config must then serve the built UI without building again. The image version follows
+`@playwright/test` (1.65.0).
 # Migrating to v1.19.1
 
 Compatible. Registry file change in `kids` (`Kids.tsx`, `kids.css`): `go tool frontend-registry sync`

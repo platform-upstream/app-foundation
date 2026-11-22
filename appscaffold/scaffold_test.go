@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -271,5 +272,21 @@ func TestGenerateRequiresAValidPlatform(t *testing.T) {
 		if err := Generate(t.TempDir(), Options{Name: "app", FoundationVersion: "v1.0.0", Platform: platform}); err == nil {
 			t.Fatalf("accepted platform %+v", platform)
 		}
+	}
+}
+
+// The Dockerfile's phone stage runs the Playwright image whose browsers belong to the
+// @playwright/test the app's package.json pins: with another version Playwright finds no browser.
+func TestPhoneStageMatchesPlaywright(t *testing.T) {
+	target := generate(t, Options{Name: "field-notes", FoundationVersion: "v1.0.0", Platform: testPlatform})
+	dockerfile := read(t, target, "Dockerfile")
+	pkg := read(t, target, "web/package.json")
+	version := regexp.MustCompile(`"@playwright/test": "([0-9.]+)"`).FindStringSubmatch(pkg)
+	if version == nil {
+		t.Fatal("web/package.json has no pinned @playwright/test")
+	}
+	image := "FROM mcr.microsoft.com/playwright:v" + version[1] + "-noble@sha256:"
+	if !strings.Contains(dockerfile, image) || !strings.Contains(dockerfile, "COPY --from=phone /phone-audit.ok") {
+		t.Fatalf("Dockerfile lacks %q or the runtime stage's marker copy", image)
 	}
 }

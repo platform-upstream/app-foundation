@@ -79,7 +79,8 @@ Checks (the Dockerfile runs the same): `go test ./...`, `go vet ./...`, `gofmt -
 `cd web && pnpm typecheck && pnpm build`. Phone audit, before every UI change is pushed:
 `cd web && pnpm build && pnpm test:phone` (built UI on 127.0.0.1:__PHONE_PORT__, API from the fixtures in
 `e2e/phone.spec.ts`; add each new route there; a browser: `pnpm exec playwright install chromium`
-or `CHROME=<chromium binary>`). Under Windows some Go tests fail on file locking; run
+or `CHROME=<chromium binary>`). The Dockerfile's `phone` stage runs the same audit, so a finding
+(also a covered control or a console error) fails verify and delivery. Under Windows some Go tests fail on file locking; run
 them in WSL or Docker.
 
 ## Delivery

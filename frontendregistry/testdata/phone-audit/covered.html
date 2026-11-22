@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Covered</title>
+<style>
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; }
+  header { position: sticky; top: 0; height: 56px; background: #fff; z-index: 2; }
+  button { font: inherit; min-height: 44px; }
+  .veil { position: fixed; top: 60px; left: 0; right: 0; height: 120px; z-index: 5; }
+  #under-veil { margin-top: 80px; }
+  .icon { position: absolute; inset: 0; pointer-events: none; }
+  .holder { position: relative; }
+  .gap { height: 1400px; }
+  nav { position: fixed; bottom: 0; left: 0; right: 0; height: 72px; background: #fff; z-index: 3; }
+</style>
+</head>
+<body>
+  <header><button id="menu" type="button">Menü</button></header>
+  <button id="under-veil" type="button">Bezahlen</button>
+  <div class="veil"></div>
+  <div class="holder"><button id="decorated" type="button">Teilen</button><span class="icon"></span></div>
+  <div class="gap"></div>
+  <button id="passes" type="button">Weiter</button>
+  <div class="gap"></div>
+  <button id="last" type="button">Mehr laden</button>
+  <nav><a href="#start">Start</a></nav>
+  <script>
+    console.error('Kaputt geladen');
+    setTimeout(() => { throw new Error('Boom'); }, 0);
+    fetch('/api/broken').catch(() => {});
+    const quiet = new AbortController();
+    fetch('/api/slow', { signal: quiet.signal }).catch(() => {});
+    quiet.abort();
+  </script>
+</body>
+</html>
