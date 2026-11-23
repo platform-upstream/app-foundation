@@ -78,7 +78,7 @@ func TestGenerateRendersCompleteApp(t *testing.T) {
 		"web/public/pwa/manifest.webmanifest": {`"name": "Field Notes: Familie"`, `"lang": "de"`},
 		"web/src/main.tsx":                    {`registerServiceWorker({ name: 'field-notes' });`, "import './foundation/motion.css';\nimport './foundation/sheet.css';\nimport './foundation/toast.css';\nimport './app.css';"},
 		"web/package.json":                    {`"name": "field-notes-web"`, `"test:phone": "playwright test"`, `"@playwright/test"`, `"@axe-core/playwright"`},
-		"web/playwright.config.ts":            {"const port = 5350;", "vite preview"},
+		"web/playwright.config.ts":            {": 5350);", "vite preview"},
 		"web/e2e/phone.spec.ts":               {"from './foundation/phone-audit-tests.ts'", "phoneAudit({"},
 		"web/e2e/foundation/phone-audit.ts":   {"export async function auditPage"},
 		"web/src/App.tsx":                     {"NotesPage", "<ToastRegion", "className: 'no-pan-x'"},
