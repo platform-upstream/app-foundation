@@ -41,7 +41,7 @@ RUN --mount=type=cache,id=gomod-${CACHE_SCOPE},target=/go/pkg/mod \
 # Phone audit (e2e/phone.spec.ts, registry module phone-audit): the built UI in Chromium at phone
 # sizes; a finding fails the build. The image's version is @playwright/test's in web/package.json
 # (its browser is in the image); the runtime stage copies the marker, so the stage always runs.
-FROM mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe AS phone
+FROM mcr.microsoft.com/playwright:v1.65.1-noble@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579 AS phone
 WORKDIR /src/web
 COPY web/package.json web/pnpm-lock.yaml ./
 RUN npm install -g "$(node -p 'require("./package.json").packageManager')"
