@@ -3,7 +3,7 @@
 # every pull request (status ci/verify). Nothing is pushed; the image is thrown away.
 # The browser tests (TestPhoneAudit, TestModulesInBrowser skip without a browser): the registry's
 # phone audit and UI modules in Playwright's Chromium. Same Playwright as the scaffold's phone stage.
-FROM mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe AS browser
+FROM mcr.microsoft.com/playwright:v1.65.1-noble@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579 AS browser
 WORKDIR /pw
 # The npm package must match the image's browser: its version is @playwright/test's in the
 # template, which Renovate moves together with the image tags (a fixed version here broke #17).
