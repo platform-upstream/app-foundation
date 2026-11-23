@@ -5,7 +5,11 @@
 # phone audit and UI modules in Playwright's Chromium. Same Playwright as the scaffold's phone stage.
 FROM mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe AS browser
 WORKDIR /pw
-RUN npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.65.0 >/dev/null
+# The npm package must match the image's browser: its version is @playwright/test's in the
+# template, which Renovate moves together with the image tags (a fixed version here broke #17).
+COPY frontendregistry/sources/template/package.json /pw/template.json
+RUN npm install --no-save --no-package-lock --no-audit --no-fund \
+    "playwright@$(node -p 'require("/pw/template.json").devDependencies["@playwright/test"]')" >/dev/null
 WORKDIR /src
 COPY frontendregistry/ ./frontendregistry/
 RUN cd frontendregistry && export PHONE_AUDIT_PLAYWRIGHT=/pw/node_modules/playwright && \
