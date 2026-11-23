@@ -36,4 +36,5 @@ Change: tests for changed behaviour; in WSL `go vet ./... && go test -race ./...
 commit to `main` without attribution; CI green (go, minimum-go, scaffold). Release: SemVer (breaking = new
 major agreed by both platform owners), MIGRATING.md entry, and a `Release: none|patch|minor|major` commit
 trailer; after green CI the platform CI's release step tags the next version (docs-only releases nothing, a major becomes a
-draft). Never tag by hand. The repo is private: never put a GitHub credential in a build or config.
+draft). Never tag by hand. The repo is public (2026-11-22): no secrets, no platform names (`ci/check.sh`);
+apps fetch it through the Go proxy, without `vendor/`.

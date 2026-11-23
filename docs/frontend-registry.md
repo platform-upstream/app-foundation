@@ -6,12 +6,11 @@ to install or check source.
 
 ## Workflow
 
-The tool is pinned with the rest of the foundation in the consumer's `go.mod` and vendored, so
-it runs offline and checks against the pinned release:
+The tool is pinned with the rest of the foundation in the consumer's `go.mod`, so it checks
+against the pinned release:
 
 ```bash
-go get -tool github.com/platform-upstream/app-foundation/cmd/frontend-registry@v0.11.0
-go mod vendor
+go get -tool github.com/platform-upstream/app-foundation/cmd/frontend-registry@vX.Y.Z
 go tool frontend-registry list
 go tool frontend-registry install -target . -modules template,api
 go tool frontend-registry check -target . -modules pwa,pwa-shell
@@ -21,13 +20,9 @@ Consumers run `check` for the modules they installed in their Dockerfile's Go st
 the update train verifies), with the registry targets copied into that stage. A pin bump that
 changes registry files fails it until `sync` is run and its diff reviewed.
 
-A pin bump resolves the private module, on any machine: `go env -w
-GOPRIVATE=github.com/platform-upstream/*` and a git credential helper for github.com (for example
-`git config --global credential.https://github.com.helper '!gh auth git-credential'`). GOPRIVATE
-implies `GONOSUMDB`, but an environment that sets `GONOPROXY` or `GONOSUMDB` itself replaces that
-default and asks sum.golang.org, where a private tag (or a fresh one) is missing (`verifying
-module: … not found`): set `GONOSUMDB=github.com/platform-upstream/*` as well. Then `go get -tool github.com/platform-upstream/app-foundation/cmd/frontend-registry@vX.Y.Z
-&& go mod vendor`, `sync` for the installed modules and review the diff.
+A pin bump is `go get -tool github.com/platform-upstream/app-foundation/cmd/frontend-registry@vX.Y.Z`
+(the module is public: no GOPRIVATE, no credential), then `sync` for the installed modules
+(`scripts/foundation-sync.sh`) and review the diff.
 
 `install` writes missing files but refuses to replace a changed target. `check` exits non-zero and
 lists missing or changed registry-owned files. `sync` is the explicit replacement operation; review

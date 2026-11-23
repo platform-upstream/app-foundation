@@ -59,7 +59,7 @@ func main() {
 	if err := appscaffold.Generate(*target, options); err != nil {
 		fail(err)
 	}
-	fmt.Printf("%s scaffolded (app-foundation %s). Next: go mod tidy && go mod vendor, then build web/.\n", options.Name, options.FoundationVersion)
+	fmt.Printf("%s scaffolded (app-foundation %s). Next: go mod tidy, then build web/.\n", options.Name, options.FoundationVersion)
 }
 
 func fail(err error) {
